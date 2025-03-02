@@ -10,7 +10,7 @@ import { useEffect } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import icons from "@/constants/icons";
+import icons from "@/app/constants/icons";
 
 import Search from "@/components/Search";
 import Filters from "@/components/Filters";

@@ -12,8 +12,8 @@ import {
 import { logout } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 
-import icons from "@/constants/icons";
-import { settings } from "@/constants/data";
+import icons from "@/app/constants/icons";
+import { settings } from "@/app/constants/data";
 
 interface SettingsItemProp {
   icon: ImageSourcePropType;
@@ -62,7 +62,7 @@ const Profile = () => {
     <SafeAreaView className="h-full bg-white">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-32 px-7"
+        contentContainerClassName="pb-300 px-7"
       >
         <View className="flex flex-row items-center justify-between mt-5">
           <Text className="text-xl font-rubik-bold">Profile</Text>
