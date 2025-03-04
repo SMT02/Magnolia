@@ -16,13 +16,8 @@ export const config = {
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
   projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
-  foodGalleriesCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_FOOD_GALLERIES_COLLECTION_ID, // Updated collection name
-  foodReviewsCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_FOOD_REVIEWS_COLLECTION_ID, // Updated collection name
-  chefsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CHEFS_COLLECTION_ID, // Updated collection name
-  foodItemsCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_FOOD_ITEMS_COLLECTION_ID, // Updated collection name
+  goodsCollectionId:
+    process.env.EXPO_PUBLIC_APPWRITE_GOODS_COLLECTION_ID, // Updated collection name
   bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID,
 };
 
@@ -98,11 +93,11 @@ export async function getCurrentUser() {
   }
 }
 
-export async function getLatestFoodItems() {
+export async function getLatestGoods() {
   try {
     const result = await databases.listDocuments(
       config.databaseId!,
-      config.foodItemsCollectionId!,
+      config.goodsCollectionId!,
       [Query.orderAsc("$createdAt"), Query.limit(5)]
     );
 
@@ -113,7 +108,7 @@ export async function getLatestFoodItems() {
   }
 }
 
-export async function getFoodItems({
+export async function getGoods({
   filter,
   query,
   limit,
@@ -141,7 +136,7 @@ export async function getFoodItems({
 
     const result = await databases.listDocuments(
       config.databaseId!,
-      config.foodItemsCollectionId!,
+      config.goodsCollectionId!,
       buildQuery
     );
 
@@ -152,12 +147,12 @@ export async function getFoodItems({
   }
 }
 
-// Write function to get food item by ID
-export async function getFoodItemById({ id }: { id: string }) {
+// Write function to get good by ID
+export async function getGoodsById({ id }: { id: string }) {
   try {
     const result = await databases.getDocument(
       config.databaseId!,
-      config.foodItemsCollectionId!,
+      config.goodsCollectionId!,
       id
     );
     return result;

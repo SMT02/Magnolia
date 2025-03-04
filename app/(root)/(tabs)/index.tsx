@@ -19,23 +19,23 @@ import { Card, FeaturedCard } from "@/components/Cards";
 
 import { useAppwrite } from "@/lib/useAppwrite";
 import { useGlobalContext } from "@/lib/global-provider";
-import { getLatestFoodItems, getFoodItems } from "@/lib/appwrite";
+import { getLatestGoods, getGoods } from "@/lib/appwrite";
 
 const Home = () => {
   const { user } = useGlobalContext();
 
   const params = useLocalSearchParams<{ query?: string; filter?: string }>();
 
-  const { data: latestFoodItems, loading: latestFoodItemsLoading } = useAppwrite({
-    fn: getLatestFoodItems,
+  const { data: latestGoods, loading: latestGoodsLoading } = useAppwrite({
+    fn: getGoods,
   });
 
   const {
-    data: foodItems,
+    data: goods,
     refetch,
     loading,
   } = useAppwrite({
-    fn: getFoodItems,
+    fn: getGoods,
     params: {
       filter: params.filter!,
       query: params.query!,
@@ -52,12 +52,12 @@ const Home = () => {
     });
   }, [params.filter, params.query]);
 
-  const handleCardPress = (id: string) => router.push(`/food-items/${id}`);
+  const handleCardPress = (id: string) => router.push(`/goods/${id}`);
 
   return (
     <SafeAreaView className="h-full bg-white">
       <FlatList
-        data={foodItems}
+        data={goods}
         numColumns={2}
         renderItem={({ item }) => (
           <Card item={item} onPress={() => handleCardPress(item.$id)} />
@@ -99,7 +99,7 @@ const Home = () => {
             <View className="my-5">
               <View className="flex flex-row items-center justify-between">
                 <Text className="text-xl font-rubik-bold text-black-300">
-                  Featured Dishes
+                  Featured Products
                 </Text>
                 <TouchableOpacity>
                   <Text className="text-base font-rubik-bold text-primary-300">
@@ -108,13 +108,13 @@ const Home = () => {
                 </TouchableOpacity>
               </View>
 
-              {latestFoodItemsLoading ? (
+              {latestGoodsLoading ? (
                 <ActivityIndicator size="large" className="text-primary-300" />
-              ) : !latestFoodItems || latestFoodItems.length === 0 ? (
+              ) : !latestGoods || latestGoods.length === 0 ? (
                 <NoResults />
               ) : (
                 <FlatList
-                  data={latestFoodItems}
+                  data={latestGoods}
                   renderItem={({ item }) => (
                     <FeaturedCard
                       item={item}

@@ -2,19 +2,39 @@ import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Models } from "react-native-appwrite";
+import { storage } from "@/lib/appwrite";
 
 interface Props {
   item: Models.Document;
   onPress?: () => void;
 }
 
+const getImageUrl = (bucketId: string, fileId: string) => {
+  return storage.getFilePreview(bucketId, fileId).href;
+};
+
+const categoryDisplayNames: { [key: string]: string } = {
+  FruitsAndVegetables: "Fruits & Vegetables",
+  MeatAndSeafood: "Meat & Seafood",
+  DairyAndEggs: "Dairy & Eggs",
+  Bakery: "Bakery",
+  Beverages: "Beverages",
+  FrozenFoods: "Frozen Foods",
+  PantryStaples: "Pantry Staples",
+  SnacksAndSweets: "Snacks & Sweets",
+  HouseholdEssentials: "Household Essentials",
+};
+
 export const FeaturedCard = ({ item, onPress }: Props) => {
+  const imageUrl = getImageUrl("67bac197000f761b18ca", item.imageId);
+  const categoryDisplayName = categoryDisplayNames[item.category] || item.category;
+
   return (
     <TouchableOpacity
       onPress={onPress}
       className="flex flex-col items-start w-60 h-80 relative"
     >
-      <Image source={{ uri: item.image }} className="size-full rounded-2xl" />
+      <Image source={{ uri: imageUrl }} className="size-full rounded-2xl" />
 
       <Image
         source={images.cardGradient}
@@ -36,12 +56,12 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
           {item.name}
         </Text>
         <Text className="text-base font-rubik text-white" numberOfLines={1}>
-          {item.address}
+          {categoryDisplayName}
         </Text>
 
         <View className="flex flex-row items-center justify-between w-full">
           <Text className="text-xl font-rubik-extrabold text-white">
-            ${item.price}
+            ${item.price.toFixed(2)}
           </Text>
           <Image source={icons.heart} className="size-5" />
         </View>
@@ -51,6 +71,9 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
 };
 
 export const Card = ({ item, onPress }: Props) => {
+  const imageUrl = getImageUrl("67bac197000f761b18ca", item.imageId);
+  const categoryDisplayName = categoryDisplayNames[item.category] || item.category;
+
   return (
     <TouchableOpacity
       className="flex-1 w-full mt-4 px-3 py-4 rounded-lg bg-white shadow-lg shadow-black-100/70 relative"
@@ -63,19 +86,19 @@ export const Card = ({ item, onPress }: Props) => {
         </Text>
       </View>
 
-      <Image source={{ uri: item.image }} className="w-full h-40 rounded-lg" />
+      <Image source={{ uri: imageUrl }} className="w-full h-40 rounded-lg" />
 
       <View className="flex flex-col mt-2">
         <Text className="text-base font-rubik-bold text-black-300">
           {item.name}
         </Text>
         <Text className="text-xs font-rubik text-black-100">
-          {item.address}
+          {categoryDisplayName}
         </Text>
 
         <View className="flex flex-row items-center justify-between mt-2">
           <Text className="text-base font-rubik-bold text-primary-300">
-            ${item.price}
+            ${item.price.toFixed(2)}
           </Text>
           <Image
             source={icons.heart}
