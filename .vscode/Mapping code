@@ -1,0 +1,51 @@
+import java.util.Scanner;
+
+public class GroceryStoreNavigator {
+    public static void main(String[] args) {
+        StoreMap store = new StoreMap();
+        ItemLocations items = new ItemLocations();
+        Scanner scanner = new Scanner(System.in);
+
+        //this defines the store layout and aisles as well as a starting position like the entrance
+        store.addLocation("Entrance");
+        store.addLocation("Fruits and Vegetables");
+        store.addLocation("Bakery");
+        store.addLocation("Beverages");
+        store.addLocation("Pantry Staples");
+        store.addLocation("Snacks and Sweets");
+        store.addLocation("Household Essentials");
+        store.addLocation("Meat and Seafood");
+        store.addLocation("Frozen Foods");
+        store.addLocation("Dairy and Eggs");
+
+        //these are examples of distances between locations just as proof on concept
+        store.addPath("Entrance", "Fruits and Vegetables", 10);
+        store.addPath("Fruits and Vegetables", "Bakery", 5);
+        store.addPath("Bakery", "Beverages", 5);
+        store.addPath("Beverages", "Pantry Staples", 5);
+        store.addPath("Pantry Staples", "Snacks and Sweets", 5);
+        store.addPath("Snacks and Sweets", "Household Essentials", 5);
+        //I didn't do the distances from the aisles to the freezers yet but it can be done
+        //by following the same steps as above
+
+        //sample items and where they might go, once I have access to the database I can
+        //fill in all items
+        items.addItem("Milk", "Dairy and Eggs");
+        items.addItem("Bread", "Bakery");
+        items.addItem("Ice Cream", "Frozen Foods");
+
+        //asking user to input their currnet location and then what item they're looking for
+        System.out.print("Enter your current location: ");
+        String currentLocation = scanner.nextLine();
+        System.out.print("Enter the item you're looking for: ");
+        String item = scanner.nextLine();
+
+        String itemLocation = items.getLocation(item);
+        if (itemLocation == null) {
+            System.out.println("Item not found in the store.");
+        } else {
+            List<String> path = PathFinder.findShortestPath(store, currentLocation, itemLocation);
+            System.out.println("Path to " + item + ": " + String.join(" -> ", path));
+        }
+    }
+}
