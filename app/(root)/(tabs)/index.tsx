@@ -48,7 +48,7 @@ const Home = () => {
     refetch({
       filter: params.filter!,
       query: params.query!,
-      limit: 6,
+      limit: 27,
     });
   }, [params.filter, params.query]);
 
