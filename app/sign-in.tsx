@@ -12,8 +12,13 @@ import {
 import { login } from "@/lib/appwrite";
 import { Redirect } from "expo-router";
 import { useGlobalContext } from "@/lib/global-provider";
+<<<<<<< HEAD
 import icons from "@/app/constants/icons";
 import images from "@/app/constants/images";
+=======
+import icons from "@/constants/icons";
+import images from "@/constants/images";
+>>>>>>> AdamDatabaseBranch2
 
 const Auth = () => {
   const { refetch, loading, isLogged } = useGlobalContext();

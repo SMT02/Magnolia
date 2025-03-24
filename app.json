@@ -15,7 +15,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
+<<<<<<< HEAD
       }
+=======
+      },
+      "package": "com.anonymous.Magnolia"
+>>>>>>> AdamDatabaseBranch2
     },
     "web": {
       "bundler": "metro",
@@ -51,4 +56,8 @@
       "typedRoutes": true
     }
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> AdamDatabaseBranch2
