@@ -16,13 +16,8 @@ export const config = {
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
   projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
-  foodGalleriesCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_FOOD_GALLERIES_COLLECTION_ID, // Updated collection name
-  foodReviewsCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_FOOD_REVIEWS_COLLECTION_ID, // Updated collection name
-  chefsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CHEFS_COLLECTION_ID, // Updated collection name
-  foodItemsCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_FOOD_ITEMS_COLLECTION_ID, // Updated collection name
+  goodsCollectionId:
+    process.env.EXPO_PUBLIC_APPWRITE_GOODS_COLLECTION_ID, // Updated collection name
   bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID,
 };
 
@@ -98,11 +93,11 @@ export async function getCurrentUser() {
   }
 }
 
-export async function getLatestFoodItems() {
+export async function getLatestGoods() {
   try {
     const result = await databases.listDocuments(
       config.databaseId!,
-      config.foodItemsCollectionId!,
+      config.goodsCollectionId!,
       [Query.orderAsc("$createdAt"), Query.limit(5)]
     );
 
@@ -113,7 +108,7 @@ export async function getLatestFoodItems() {
   }
 }
 
-export async function getFoodItems({
+export async function getGoods({
   filter,
   query,
   limit,
@@ -123,17 +118,17 @@ export async function getFoodItems({
   limit?: number;
 }) {
   try {
-    const buildQuery = [Query.orderDesc("$createdAt")];
+    const buildQuery = [Query.orderAsc("$createdAt")];
 
     if (filter && filter !== "All")
-      buildQuery.push(Query.equal("type", filter));
+      buildQuery.push(Query.equal("category", filter));
 
     if (query)
       buildQuery.push(
         Query.or([
           Query.search("name", query),
           Query.search("description", query), // Updated search fields
-          Query.search("type", query),
+          Query.search("category", query),
         ])
       );
 
@@ -141,7 +136,7 @@ export async function getFoodItems({
 
     const result = await databases.listDocuments(
       config.databaseId!,
-      config.foodItemsCollectionId!,
+      config.goodsCollectionId!,
       buildQuery
     );
 
@@ -152,15 +147,23 @@ export async function getFoodItems({
   }
 }
 
-// Write function to get food item by ID
-export async function getFoodItemById({ id }: { id: string }) {
+// Write function to get good by ID
+export async function getGoodsById({ id }: { id: string }) {
   try {
-    const result = await databases.getDocument(
+    // Use a filter to match the custom `id` attribute
+    const result = await databases.listDocuments(
       config.databaseId!,
-      config.foodItemsCollectionId!,
-      id
+      config.goodsCollectionId!,
+      [Query.equal("id", parseInt(id))] // Use `parseInt` to convert the string back to an integer
     );
-    return result;
+
+    // Return the first document if found
+    if (result.documents.length > 0) {
+      return result.documents[0];
+    }
+
+    // If no matching documents are found, return null
+    return null;
   } catch (error) {
     console.error(error);
     return null;
