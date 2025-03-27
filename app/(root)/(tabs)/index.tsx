@@ -10,11 +10,7 @@ import { useEffect } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-<<<<<<< HEAD
 import icons from "@/app/constants/icons";
-=======
-import icons from "@/constants/icons";
->>>>>>> AdamDatabaseBranch2
 
 import Search from "@/components/Search";
 import Filters from "@/components/Filters";
@@ -23,18 +19,13 @@ import { Card, FeaturedCard } from "@/components/Cards";
 
 import { useAppwrite } from "@/lib/useAppwrite";
 import { useGlobalContext } from "@/lib/global-provider";
-<<<<<<< HEAD
 import { getLatestFoodItems, getFoodItems } from "@/lib/appwrite";
-=======
-import { getLatestGoods, getGoods } from "@/lib/appwrite";
->>>>>>> AdamDatabaseBranch2
 
 const Home = () => {
   const { user } = useGlobalContext();
 
   const params = useLocalSearchParams<{ query?: string; filter?: string }>();
 
-<<<<<<< HEAD
   const { data: latestFoodItems, loading: latestFoodItemsLoading } = useAppwrite({
     fn: getLatestFoodItems,
   });
@@ -45,18 +36,6 @@ const Home = () => {
     loading,
   } = useAppwrite({
     fn: getFoodItems,
-=======
-  const { data: latestGoods, loading: latestGoodsLoading } = useAppwrite({
-    fn: getGoods,
-  });
-
-  const {
-    data: goods,
-    refetch,
-    loading,
-  } = useAppwrite({
-    fn: getGoods,
->>>>>>> AdamDatabaseBranch2
     params: {
       filter: params.filter!,
       query: params.query!,
@@ -69,28 +48,16 @@ const Home = () => {
     refetch({
       filter: params.filter!,
       query: params.query!,
-<<<<<<< HEAD
       limit: 6,
     });
   }, [params.filter, params.query]);
 
   const handleCardPress = (id: string) => router.push(`/food-items/${id}`);
-=======
-      limit: 27,
-    });
-  }, [params.filter, params.query]);
-
-  const handleCardPress = (id: string) => router.push(`/goods/${id}`);
->>>>>>> AdamDatabaseBranch2
 
   return (
     <SafeAreaView className="h-full bg-white">
       <FlatList
-<<<<<<< HEAD
         data={foodItems}
-=======
-        data={goods}
->>>>>>> AdamDatabaseBranch2
         numColumns={2}
         renderItem={({ item }) => (
           <Card item={item} onPress={() => handleCardPress(item.$id)} />
@@ -132,11 +99,7 @@ const Home = () => {
             <View className="my-5">
               <View className="flex flex-row items-center justify-between">
                 <Text className="text-xl font-rubik-bold text-black-300">
-<<<<<<< HEAD
                   Featured Dishes
-=======
-                  Featured Products
->>>>>>> AdamDatabaseBranch2
                 </Text>
                 <TouchableOpacity>
                   <Text className="text-base font-rubik-bold text-primary-300">
@@ -145,7 +108,6 @@ const Home = () => {
                 </TouchableOpacity>
               </View>
 
-<<<<<<< HEAD
               {latestFoodItemsLoading ? (
                 <ActivityIndicator size="large" className="text-primary-300" />
               ) : !latestFoodItems || latestFoodItems.length === 0 ? (
@@ -153,15 +115,6 @@ const Home = () => {
               ) : (
                 <FlatList
                   data={latestFoodItems}
-=======
-              {latestGoodsLoading ? (
-                <ActivityIndicator size="large" className="text-primary-300" />
-              ) : !latestGoods || latestGoods.length === 0 ? (
-                <NoResults />
-              ) : (
-                <FlatList
-                  data={latestGoods}
->>>>>>> AdamDatabaseBranch2
                   renderItem={({ item }) => (
                     <FeaturedCard
                       item={item}

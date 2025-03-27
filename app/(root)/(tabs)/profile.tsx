@@ -12,13 +12,8 @@ import {
 import { logout } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 
-<<<<<<< HEAD
 import icons from "@/app/constants/icons";
 import { settings } from "@/app/constants/data";
-=======
-import icons from "@/constants/icons";
-import { settings } from "@/constants/data";
->>>>>>> AdamDatabaseBranch2
 
 interface SettingsItemProp {
   icon: ImageSourcePropType;
@@ -67,11 +62,7 @@ const Profile = () => {
     <SafeAreaView className="h-full bg-white">
       <ScrollView
         showsVerticalScrollIndicator={false}
-<<<<<<< HEAD
         contentContainerClassName="pb-300 px-7"
-=======
-        contentContainerClassName="pb-32 px-7"
->>>>>>> AdamDatabaseBranch2
       >
         <View className="flex flex-row items-center justify-between mt-5">
           <Text className="text-xl font-rubik-bold">Profile</Text>

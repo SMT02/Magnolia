@@ -1,11 +1,6 @@
-import { Tabs } from "expo-router";
 import { Image, ImageSourcePropType, Text, View } from "react-native";
-
-<<<<<<< HEAD
-import icons from "@/app/constants/icons";
-=======
-import icons from "@/constants/icons";
->>>>>>> AdamDatabaseBranch2
+import icons from "@/constants/icons"; 
+import { Tabs } from "expo-router";
 
 const TabIcon = ({
   focused,
@@ -22,7 +17,7 @@ const TabIcon = ({
       tintColor={focused ? "#32a852" : "#666876"}
       resizeMode="contain"
       className="size-6"
-    />r
+    />
     <Text
       className={`${
         focused
@@ -62,17 +57,10 @@ const TabsLayout = () => {
       <Tabs.Screen
         name="explore"
         options={{
-<<<<<<< HEAD
           title: "Chat",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused} icon={icons.search} title="Chat" />
-=======
-          title: "Explore",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={icons.search} title="Explore" />
->>>>>>> AdamDatabaseBranch2
           ),
         }}
       />

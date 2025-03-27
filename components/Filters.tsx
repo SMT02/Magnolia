@@ -2,11 +2,7 @@ import React, { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Text, ScrollView, TouchableOpacity } from "react-native";
 
-<<<<<<< HEAD
 import { categories } from "@/app/constants/data";
-=======
-import { categories } from "@/constants/data";
->>>>>>> AdamDatabaseBranch2
 
 const Filters = () => {
   const params = useLocalSearchParams<{ filter?: string }>();

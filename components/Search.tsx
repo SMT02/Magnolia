@@ -2,11 +2,7 @@ import React, { useState } from "react";
 import { View, TouchableOpacity, Image, TextInput } from "react-native";
 import { useDebouncedCallback } from "use-debounce";
 
-<<<<<<< HEAD
 import icons from "@/app/constants/icons";
-=======
-import icons from "@/constants/icons";
->>>>>>> AdamDatabaseBranch2
 import { useLocalSearchParams, router, usePathname } from "expo-router";
 
 const Search = () => {

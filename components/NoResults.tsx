@@ -1,11 +1,7 @@
 import React from "react";
 import { View, Text, Image } from "react-native";
 
-<<<<<<< HEAD
 import images from "@/app/constants/images";
-=======
-import images from "@/constants/images";
->>>>>>> AdamDatabaseBranch2
 
 const NoResults = () => {
   return (
