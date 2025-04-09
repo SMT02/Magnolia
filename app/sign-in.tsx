@@ -12,8 +12,8 @@ import {
 import { login } from "@/lib/appwrite";
 import { Redirect } from "expo-router";
 import { useGlobalContext } from "@/lib/global-provider";
-import icons from "@/app/constants/icons";
-import images from "@/app/constants/images";
+import icons from "@/constants/icons";
+import images from "@/constants/images";
 
 const Auth = () => {
   const { refetch, loading, isLogged } = useGlobalContext();

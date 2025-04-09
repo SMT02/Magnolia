@@ -9,8 +9,10 @@ interface Props {
   onPress?: () => void;
 }
 
-const getImageUrl = (bucketId: string, fileId: string) => {
-  return storage.getFilePreview(bucketId, fileId).href;
+// ✅ Use getFileView instead of getFilePreview (avoids image transformation error)
+const getImageUrl = (bucketId: string, fileId?: string) => {
+  if (!fileId) return null;
+  return storage.getFileView(bucketId, fileId).href;
 };
 
 const categoryDisplayNames: { [key: string]: string } = {
@@ -34,7 +36,9 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
       onPress={onPress}
       className="flex flex-col items-start w-60 h-80 relative"
     >
-      <Image source={{ uri: imageUrl }} className="size-full rounded-2xl" />
+      {imageUrl && (
+        <Image source={{ uri: imageUrl }} className="size-full rounded-2xl" />
+      )}
 
       <Image
         source={images.cardGradient}
@@ -49,10 +53,7 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
       </View>
 
       <View className="flex flex-col items-start absolute bottom-5 inset-x-5">
-        <Text
-          className="text-xl font-rubik-extrabold text-white"
-          numberOfLines={1}
-        >
+        <Text className="text-xl font-rubik-extrabold text-white" numberOfLines={1}>
           {item.name}
         </Text>
         <Text className="text-base font-rubik text-white" numberOfLines={1}>
@@ -72,6 +73,7 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
 
 export const Card = ({ item, onPress }: Props) => {
   const imageUrl = getImageUrl("67bac197000f761b18ca", item.imageId);
+
   const categoryDisplayName = categoryDisplayNames[item.category] || item.category;
 
   return (
@@ -86,7 +88,9 @@ export const Card = ({ item, onPress }: Props) => {
         </Text>
       </View>
 
-      <Image source={{ uri: imageUrl }} className="w-full h-40 rounded-lg" />
+      {imageUrl && (
+        <Image source={{ uri: imageUrl }} className="w-full h-40 rounded-lg" />
+      )}
 
       <View className="flex flex-col mt-2">
         <Text className="text-base font-rubik-bold text-black-300">

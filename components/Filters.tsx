@@ -1,8 +1,7 @@
 import React, { useState } from "react";
-import { router, useLocalSearchParams } from "expo-router";
 import { Text, ScrollView, TouchableOpacity } from "react-native";
-
-import { categories } from "@/app/constants/data";
+import { useLocalSearchParams, router } from "expo-router";
+import { categories } from "@/constants/data"; // Updated import path
 
 const Filters = () => {
   const params = useLocalSearchParams<{ filter?: string }>();
