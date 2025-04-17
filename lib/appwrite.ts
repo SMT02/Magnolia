@@ -114,7 +114,7 @@ export async function getGoods({
   limit?: number;
 }) {
   try {
-    const buildQuery = [Query.orderAsc("$createdAt")];
+    const buildQuery = [Query.orderAsc("$createdAt"), Query.limit(100)];
 
     if (filter && filter !== "All")
       buildQuery.push(Query.equal("category", filter));
@@ -128,7 +128,9 @@ export async function getGoods({
         ])
       );
 
-    if (limit) buildQuery.push(Query.limit(limit));
+    if (limit) {
+      buildQuery[1] = Query.limit(limit);
+    }
 
     const result = await databases.listDocuments(
       config.databaseId!,

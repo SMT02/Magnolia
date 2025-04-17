@@ -216,15 +216,15 @@ export const featuredCards = [];
 
 export const categories = [
   { title: "All", category: "All" },
-  { title: "Fruits & Vegetables", category: "fruits" },
-  { title: "Meat & Seafood", category: "meat" },
-  { title: "Dairy & Eggs", category: "dairy" },
-  { title: "Bakery", category: "bakery" },
-  { title: "Beverages", category: "beverages" },
-  { title: "Frozen Foods", category: "frozen" },
-  { title: "Pantry Staples", category: "pantry" },
-  { title: "Snacks & Sweets", category: "snacks" },
-  { title: "Household Essentials", category: "household" },
+  { title: "Fruits & Vegetables", category: "FruitsAndVegetables" },
+  { title: "Meat & Seafood", category: "MeatAndSeafood" },
+  { title: "Dairy & Eggs", category: "DairyAndEggs" },
+  { title: "Bakery", category: "Bakery" },
+  { title: "Beverages", category: "Beverages" },
+  { title: "Frozen Foods", category: "FrozenFoods" },
+  { title: "Pantry Staples", category: "PantryStaples" },
+  { title: "Snacks & Sweets", category: "SnacksAndSweets" },
+  { title: "Household Essentials", category: "HouseholdEssentials" },
 ];
 
 export const settings = [

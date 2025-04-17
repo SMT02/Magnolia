@@ -20,6 +20,8 @@ import { searchGoods } from '@/lib/appwrite';
 import { Link } from 'expo-router';
 import { useShoppingList } from "@/lib/shopping-list-provider";
 import images from "@/constants/images";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Query } from "appwrite";
 
 const API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 console.log("🔑 Loaded API KEY:", API_KEY);
@@ -29,6 +31,8 @@ if (!API_KEY) {
   console.error("❌ No API key found in environment variables");
 }
 
+const ASSISTANT_ID = "asst_nbZZGs77RJ9gBufyJVrnMEE1";
+
 type Message = {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -37,28 +41,54 @@ type Message = {
 // System prompt for the AI
 const getSystemPrompt = (currentList: ShoppingListItem[]): Message => ({
   role: 'system',
-  content: `You are a helpful and friendly shopping assistant at Magnolia store. Your role is to:
-1. Help users build and modify their shopping lists
-2. Provide information about available goods and suggestions
-3. Answer questions about goods availability and location
-4. Suggest complementary items
+  content: `# Magnolia AI Shopping Assistant
+
+You are Magnolia's AI shopping assistant, designed to help customers with their shopping experience in a friendly, conversational way.
 
 Current Shopping List:
 ${currentList.map(item => `- ${item.name} ($${item.price})`).join('\n')}
 
-Keep responses conversational and helpful. When adding items:
-- Confirm what's being added
-- Be aware of what's already in the list
-- Suggest related items that aren't already in the list
-- Mention any current deals
-- Be friendly but concise
-- If user mentions removing items, acknowledge that they're no longer in the list
+CORE RESPONSIBILITIES:
+1. Shopping List Management
+- Help users build and modify their shopping lists
+- Suggest complementary items based on what's already in their list
+- Remember items mentioned throughout the conversation
+- Confirm additions/removals naturally and conversationally
 
-Example responses:
-"I've added milk to your list! Would you also need some cereal?"
-"I see you've removed the apples. Would you like to try a different fruit instead?"
-"Great choice! The bread is really fresh today. I notice you have butter in your list - perfect combination!"
-"I see you're getting pasta. Would you like me to add sauce too? Our marinara is on sale!"`,
+2. Product Knowledge
+- Provide detailed information about products (price, location, availability)
+- Suggest related items and mention current deals
+- If unsure about a product, ask for clarification
+
+3. Navigation & Route Optimization
+- Help users locate items in store
+- Group items by department or aisle
+
+CONVERSATION STYLE:
+- Friendly and casual, but professional
+- Use natural, human language
+- Keep responses concise but helpful
+- Use emojis sparingly
+- Address users by name when available
+
+RESPONSE EXAMPLES:
+✅ "I'll add that milk to your list! Since you're in dairy, would you also need some eggs?"
+✅ "You're picking up pasta—would you like some marinara sauce too? It's on sale!"
+✅ "You'll find the bread in our Bakery section near the front. By the way, our croissants are freshly baked this morning!"
+
+CRITICAL RULES:
+1. NEVER show or mention the [P1], [P2] product codes to users
+2. Only suggest products that exist in our inventory
+3. If a product isn't in our inventory, say "I apologize, but I don't see that product in our current inventory. Would you like to see what similar products we have available?"
+4. Keep track of the shopping list and suggest complementary items
+5. Mention relevant deals and promotions
+6. Group items by department when possible
+7. Be helpful and friendly, but don't make assumptions about product availability
+
+PRIVACY & SECURITY:
+- Do not share personal customer data
+- Do not promise item availability without verification
+- Do not discuss internal policies or logistics`,
 });
 
 interface Good extends Models.Document {
@@ -77,6 +107,60 @@ interface ShoppingListItem {
   imageId: string;
   rating: number;
 }
+
+// Function to get all available products
+const getAllProducts = async () => {
+  try {
+    const result = await databases.listDocuments(
+      config.databaseId!,
+      config.goodsCollectionId!,
+      [Query.orderAsc("$createdAt"), Query.limit(100)]
+    );
+    return result.documents.map(doc => ({
+      name: doc.name,
+      category: doc.category,
+      price: doc.price,
+      id: doc.$id
+    }));
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return [];
+  }
+};
+
+// Function to format product list with codes
+const formatProductList = (products: any[]) => {
+  return products.map((p, index) => {
+    const code = `[P${index + 1}]`;
+    return {
+      ...p,
+      code,
+      display: `${code} ${p.name} (${p.category}) - $${p.price}`
+    };
+  });
+};
+
+// Extract product codes from response
+const extractProductCodes = (response: string): string[] => {
+  const codeRegex = /\[P\d+\]/g;
+  const matches = response.match(codeRegex) || [];
+  return matches;
+};
+
+// Function to refresh thread
+const refreshThread = async (apiKey: string) => {
+  try {
+    // Delete old thread if it exists
+    const oldThreadId = await AsyncStorage.getItem('thread_id');
+    if (oldThreadId) {
+      await AsyncStorage.removeItem('thread_id');
+    }
+    return null;
+  } catch (error) {
+    console.error("Error refreshing thread:", error);
+    return null;
+  }
+};
 
 const Explore = () => {
   const { isLogged, user, loading } = useGlobalContext();
@@ -141,39 +225,6 @@ const Explore = () => {
     ]);
   }, [shoppingList]);
 
-  // Extract items from AI response
-  const extractItemsFromResponse = (response: string): string[] => {
-    const itemRegex = /add(?:ed|ing)?\s+([^.!?]+)(?:to your list|to the list)?/i;
-    const match = response.match(itemRegex);
-    if (match) {
-      return match[1].split(/,|\sand\s/).map(item => item.trim());
-    }
-    return [];
-  };
-
-  const findGood = async (name: string): Promise<Good | null> => {
-    try {
-      // We can use the existing searchGoods function from appwrite.ts
-      const results = await searchGoods(name);
-      if (results.length > 0) {
-        const doc = results[0];
-        if (
-          'name' in doc &&
-          'category' in doc &&
-          'imageId' in doc &&
-          'price' in doc &&
-          'rating' in doc
-        ) {
-          return doc as Good;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Error searching for good:', error);
-      return null;
-    }
-  };
-
   const sendMessage = async () => {
     if (!input.trim()) return;
     if (!API_KEY) {
@@ -188,46 +239,168 @@ const Explore = () => {
     setError(null);
 
     try {
-      // Include current shopping list state in the conversation
-      const currentMessages = [
-        getSystemPrompt(shoppingList),
-        ...messages.slice(1),
-        userMessage
-      ];
+      // Get all available products first
+      const availableProducts = await getAllProducts();
+      console.log("Available products loaded:", availableProducts.length);
+      
+      // Format products with codes
+      const formattedProducts = formatProductList(availableProducts);
+      const productCodeMap = Object.fromEntries(
+        formattedProducts.map(p => [p.code, p])
+      );
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: currentMessages,
-          temperature: 0.7,
-          max_tokens: 150,
-          presence_penalty: 0.6,
-          frequency_penalty: 0.2,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Failed to get response');
+      // Refresh thread every 10 messages to ensure fresh context
+      const messageCount = messages.length;
+      if (messageCount > 0 && messageCount % 10 === 0) {
+        await refreshThread(API_KEY);
       }
 
-      const data = await response.json();
-      const aiResponse = data.choices[0]?.message?.content || '';
+      // First create a thread if we don't have one
+      let threadId = await AsyncStorage.getItem('thread_id');
       
-      // Extract any items mentioned in the response
-      const newItems = extractItemsFromResponse(aiResponse);
-      if (newItems.length > 0) {
-        await addToShoppingList(newItems);
+      if (!threadId) {
+        console.log("Creating new thread...");
+        const threadResponse = await fetch('https://api.openai.com/v1/threads', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json',
+            'OpenAI-Beta': 'assistants=v2'
+          },
+          body: JSON.stringify({})
+        });
+        
+        if (!threadResponse.ok) {
+          const errorData = await threadResponse.json();
+          console.error("Thread creation error:", errorData);
+          throw new Error(`Failed to create thread: ${errorData.error?.message || 'Unknown error'}`);
+        }
+
+        const threadData = await threadResponse.json();
+        console.log("Thread created:", threadData);
+        threadId = threadData.id as string;
+        await AsyncStorage.setItem('thread_id', threadId);
+
+        // Send initial context about available products
+        const contextMessage = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json',
+            'OpenAI-Beta': 'assistants=v2'
+          },
+          body: JSON.stringify({
+            role: 'user',
+            content: `IMPORTANT: This is a new conversation. Here is your product inventory:
+
+${formattedProducts.map(p => p.display).join('\n')}
+
+CRITICAL RULES:
+1. You MUST use product codes [P1], [P2], etc. internally for tracking
+2. NEVER show these codes to users in your responses
+3. Only suggest products from this list
+4. If a product isn't in this list, politely inform the user it's not in stock
+5. Keep your responses natural and conversational
+6. Use the exact product names as listed
+7. Maintain accurate pricing in your responses
+
+Example correct responses:
+✅ "I'll add the milk to your list! Would you like some eggs too?"
+✅ "I've found our fresh bread in stock. Would you like me to add it to your list?"
+✅ "I'm sorry, but I don't see that item in our current inventory. Would you like to see some similar products we have available?"
+
+Remember: While you must use the [P_] codes internally for tracking, never show them to users in your responses.`
+          })
+        });
+
+        if (!contextMessage.ok) {
+          console.error("Failed to send product context");
+        }
+      }
+
+      console.log("Using thread:", threadId);
+
+      // Add the user's message
+      const messageResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json',
+          'OpenAI-Beta': 'assistants=v2'
+        },
+        body: JSON.stringify({
+          role: 'user',
+          content: input
+        })
+      });
+
+      if (!messageResponse.ok) {
+        const errorData = await messageResponse.json();
+        console.error("Message creation error:", errorData);
+        throw new Error(`Failed to add message: ${errorData.error?.message || 'Unknown error'}`);
+      }
+
+      // Run the assistant
+      const runResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json',
+          'OpenAI-Beta': 'assistants=v2'
+        },
+        body: JSON.stringify({
+          assistant_id: ASSISTANT_ID
+        })
+      });
+
+      if (!runResponse.ok) {
+        const errorData = await runResponse.json();
+        console.error("Run creation error:", errorData);
+        throw new Error(`Failed to run assistant: ${errorData.error?.message || 'Unknown error'}`);
+      }
+
+      const runData = await runResponse.json();
+      console.log("Run created:", runData);
+
+      // Poll for completion
+      let runStatus = await checkRunStatus(threadId, runData.id, API_KEY);
+      while (runStatus === 'in_progress' || runStatus === 'queued') {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        runStatus = await checkRunStatus(threadId, runData.id, API_KEY);
+      }
+
+      // Get the messages
+      const messagesResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
+        headers: {
+          'Authorization': `Bearer ${API_KEY}`,
+          'Content-Type': 'application/json',
+          'OpenAI-Beta': 'assistants=v2'
+        }
+      });
+
+      if (!messagesResponse.ok) {
+        const errorData = await messagesResponse.json();
+        console.error("Messages retrieval error:", errorData);
+        throw new Error(`Failed to get messages: ${errorData.error?.message || 'Unknown error'}`);
+      }
+
+      const messagesData = await messagesResponse.json();
+      const lastMessage = messagesData.data[0];
+      const messageContent = lastMessage.content[0].text.value;
+
+      // Extract product codes and validate them
+      const productCodes = extractProductCodes(messageContent);
+      const validProducts = productCodes
+        .filter(code => productCodeMap[code])
+        .map(code => productCodeMap[code].name);
+
+      if (validProducts.length > 0) {
+        await addToShoppingList(validProducts);
       }
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: aiResponse,
+        content: messageContent,
       };
       setMessages(prev => [...prev, assistantMessage]);
 
@@ -237,6 +410,19 @@ const Explore = () => {
     } finally {
       setIsTyping(false);
     }
+  };
+
+  // Helper function to check run status
+  const checkRunStatus = async (threadId: string, runId: string, apiKey: string) => {
+    const response = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runId}`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'OpenAI-Beta': 'assistants=v2'
+      }
+    });
+    if (!response.ok) throw new Error('Failed to check run status');
+    const data = await response.json();
+    return data.status;
   };
 
   return (
