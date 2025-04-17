@@ -215,16 +215,88 @@ export const cards = [
 export const featuredCards = [];
 
 export const categories = [
-  { title: "All", category: "All" },
-  { title: "Fruits & Vegetables", category: "FruitsAndVegetables" },
-  { title: "Meat & Seafood", category: "MeatAndSeafood" },
-  { title: "Dairy & Eggs", category: "DairyAndEggs" },
-  { title: "Bakery", category: "Bakery" },
-  { title: "Beverages", category: "Beverages" },
-  { title: "Frozen Foods", category: "FrozenFoods" },
-  { title: "Pantry Staples", category: "PantryStaples" },
-  { title: "Snacks & Sweets", category: "SnacksAndSweets" },
-  { title: "Household Essentials", category: "HouseholdEssentials" },
+  { title: "All", category: "All", location: null },
+  { 
+    title: "Fruits & Vegetables", 
+    category: "FruitsAndVegetables",
+    location: {
+      area: "Front Right",
+      aisle: "Produce Section",
+      description: "First section when entering, right side"
+    }
+  },
+  { 
+    title: "Bakery", 
+    category: "Bakery",
+    location: {
+      area: "Front Left",
+      aisle: "Bakery Section",
+      description: "First section when entering, left side"
+    }
+  },
+  { 
+    title: "Dairy & Eggs", 
+    category: "DairyAndEggs",
+    location: {
+      area: "Back Wall",
+      aisle: "Aisle 12",
+      description: "Along the back wall, refrigerated section"
+    }
+  },
+  { 
+    title: "Meat & Seafood", 
+    category: "MeatAndSeafood",
+    location: {
+      area: "Back Right",
+      aisle: "Meat Counter",
+      description: "Back right corner, behind produce"
+    }
+  },
+  { 
+    title: "Beverages", 
+    category: "Beverages",
+    location: {
+      area: "Center",
+      aisle: "Aisle 3-4",
+      description: "Center aisles, near front"
+    }
+  },
+  { 
+    title: "Frozen Foods", 
+    category: "FrozenFoods",
+    location: {
+      area: "Right Wall",
+      aisle: "Aisle 13-14",
+      description: "Along right wall, freezer section"
+    }
+  },
+  { 
+    title: "Pantry Staples", 
+    category: "PantryStaples",
+    location: {
+      area: "Center",
+      aisle: "Aisle 5-7",
+      description: "Center aisles"
+    }
+  },
+  { 
+    title: "Snacks & Sweets", 
+    category: "SnacksAndSweets",
+    location: {
+      area: "Center",
+      aisle: "Aisle 8-9",
+      description: "Center aisles, near back"
+    }
+  },
+  { 
+    title: "Household Essentials", 
+    category: "HouseholdEssentials",
+    location: {
+      area: "Left Wall",
+      aisle: "Aisle 15-16",
+      description: "Along left wall, last aisles"
+    }
+  },
 ];
 
 export const settings = [
