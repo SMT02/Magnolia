@@ -21,6 +21,17 @@ import { useAppwrite } from "@/lib/useAppwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { getLatestGoods, getGoods } from "@/lib/appwrite";
 
+// Add getGreeting function
+const getGreeting = () => {
+  const date = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
+  const hour = new Date(date).getHours();
+
+  if (hour >= 5 && hour < 12) return "Good Morning,";
+  if (hour >= 12 && hour < 17) return "Good Afternoon,";
+  if (hour >= 17 && hour < 21) return "Good Evening,";
+  return "Good Night,";
+};
+
 const Home = () => {
   const { user } = useGlobalContext();
 
@@ -82,7 +93,7 @@ const Home = () => {
 
                 <View className="flex flex-col items-start ml-2 justify-center">
                   <Text className="text-xs font-rubik text-black-100">
-                    Good Morning
+                    {getGreeting()}
                   </Text>
                   <Text className="text-base font-rubik-medium text-black-300">
                     {user?.name}
