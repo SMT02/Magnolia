@@ -55,12 +55,32 @@ const TabsLayout = () => {
         }}
       />
       <Tabs.Screen
+        name="list"
+        options={{
+          title: "List",
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon={icons.list} title="List" />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
           title: "Chat",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={icons.search} title="Chat" />
+            <TabIcon focused={focused} icon={icons.chat} title="Chat" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="Mapping"
+        options={{
+          title: "Map",
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon={icons.map} title="Map" />
           ),
         }}
       />

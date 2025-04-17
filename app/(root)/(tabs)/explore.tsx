@@ -7,9 +7,19 @@ import {
   TouchableOpacity,
   Image,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlobalContext } from '@/lib/global-provider';
+import icons from '@/constants/icons';
+import { config, databases } from '@/lib/appwrite';
+import { Models } from "react-native-appwrite";
+import { searchGoods } from '@/lib/appwrite';
+import { Link } from 'expo-router';
+import { useShoppingList } from "@/lib/shopping-list-provider";
+import images from "@/constants/images";
 
 const API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 console.log("🔑 Loaded API KEY:", API_KEY);
@@ -20,17 +30,67 @@ if (!API_KEY) {
 }
 
 type Message = {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
 };
 
+// System prompt for the AI
+const getSystemPrompt = (currentList: ShoppingListItem[]): Message => ({
+  role: 'system',
+  content: `You are a helpful and friendly shopping assistant at Magnolia store. Your role is to:
+1. Help users build and modify their shopping lists
+2. Provide information about available goods and suggestions
+3. Answer questions about goods availability and location
+4. Suggest complementary items
+
+Current Shopping List:
+${currentList.map(item => `- ${item.name} ($${item.price})`).join('\n')}
+
+Keep responses conversational and helpful. When adding items:
+- Confirm what's being added
+- Be aware of what's already in the list
+- Suggest related items that aren't already in the list
+- Mention any current deals
+- Be friendly but concise
+- If user mentions removing items, acknowledge that they're no longer in the list
+
+Example responses:
+"I've added milk to your list! Would you also need some cereal?"
+"I see you've removed the apples. Would you like to try a different fruit instead?"
+"Great choice! The bread is really fresh today. I notice you have butter in your list - perfect combination!"
+"I see you're getting pasta. Would you like me to add sauce too? Our marinara is on sale!"`,
+});
+
+interface Good extends Models.Document {
+  name: string;
+  category: string;
+  imageId: string;
+  price: number;
+  rating: number;
+}
+
+interface ShoppingListItem {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  imageId: string;
+  rating: number;
+}
+
 const Explore = () => {
   const { isLogged, user, loading } = useGlobalContext();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { shoppingList, addToShoppingList } = useShoppingList();
+  const [messages, setMessages] = useState<Message[]>([
+    getSystemPrompt([]),
+    {
+      role: 'assistant',
+      content: "Hi! I'm your Magnolia shopping assistant. How can I help you today?",
+    },
+  ]);
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [shoppingList, setShoppingList] = useState<string[]>([]);
-  const [optimizedRoute, setOptimizedRoute] = useState<string[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const aisleOrder = [
@@ -45,156 +105,95 @@ const Explore = () => {
     'HouseholdEssentials',
   ];
 
-  const products = [
-    { name: 'Milk', category: 'DairyAndEggs' },
-    { name: 'Eggs', category: 'DairyAndEggs' },
-    { name: 'Bread', category: 'Bakery' },
-    { name: 'Apples', category: 'FruitsAndVegetables' },
-    { name: 'Chicken', category: 'MeatAndSeafood' },
-    { name: 'Rice', category: 'PantryStaples' },
-    { name: 'Chips', category: 'SnacksAndSweets' },
-    { name: 'Toilet Paper', category: 'HouseholdEssentials' },
-    { name: 'Pepsi', category: 'Beverages' },
-  ];
-
-  // Add product database
-  const productDatabase = [
-    { name: 'Apples', category: 'FruitsAndVegetables', price: '$0.99/each', inStock: true },
-    { name: 'Beans', category: 'PantryStaples', price: '$1.20', inStock: true },
-    { name: 'Bread', category: 'Bakery', price: '$2.99', inStock: true },
-    { name: 'Broccoli', category: 'FruitsAndVegetables', price: '$2.99/lb', inStock: true },
-    { name: 'Candy', category: 'SnacksAndSweets', price: '$1.99', inStock: true },
-    { name: 'Carrots', category: 'FruitsAndVegetables', price: '$1.49/lb', inStock: true },
-    { name: 'Cheddar Cheese', category: 'DairyAndEggs', price: '$4.99', inStock: true },
-    { name: 'Chicken Breast', category: 'MeatAndSeafood', price: '$7.99/lb', inStock: true },
-    { name: 'Chips', category: 'SnacksAndSweets', price: '$3.49', inStock: true },
-    { name: 'Chocolate Bar', category: 'SnacksAndSweets', price: '$1.50', inStock: true },
-    { name: 'Coffee', category: 'Beverages', price: '$8.99', inStock: true },
-    { name: 'Croissant', category: 'Bakery', price: '$1.99', inStock: true },
-    { name: 'Eggs', category: 'DairyAndEggs', price: '$3.99', inStock: true },
-    { name: 'Frozen Peas', category: 'FrozenFoods', price: '$2.50', inStock: true },
-    { name: 'Frozen Pizza', category: 'FrozenFoods', price: '$6.99', inStock: true },
-    { name: 'Ground Beef', category: 'MeatAndSeafood', price: '$5.49/lb', inStock: true },
-    { name: 'Ice Cream', category: 'FrozenFoods', price: '$4.99', inStock: true },
-    { name: 'Laundry Detergent', category: 'HouseholdEssentials', price: '$12.99', inStock: true },
-    { name: 'Milk', category: 'DairyAndEggs', price: '$4.99', inStock: true },
-    { name: 'Muffin', category: 'Bakery', price: '$2.20', inStock: true },
-    { name: 'Pasta', category: 'PantryStaples', price: '$1.89', inStock: true },
-    { name: 'Pepsi', category: 'Beverages', price: '$1.50', inStock: true },
-    { name: 'Rice', category: 'PantryStaples', price: '$3.00', inStock: true },
-    { name: 'Salmon', category: 'MeatAndSeafood', price: '$9.99/lb', inStock: true },
-    { name: 'Toilet Paper', category: 'HouseholdEssentials', price: '$6.99', inStock: true },
-    { name: 'Toothpaste', category: 'HouseholdEssentials', price: '$3.25', inStock: true },
-    { name: 'Water', category: 'Beverages', price: '$1.00', inStock: true }
-  ];
-
-  function optimizeList(list: string[]) {
-    return list
-      .map((item) => {
-        const match = products.find(
-          (p) => p.name.toLowerCase() === item.toLowerCase()
-        );
-        return match || { name: item, category: 'Unknown' };
-      })
+  function optimizeList(items: ShoppingListItem[]) {
+    return items
       .sort((a, b) => {
         const aIndex = aisleOrder.indexOf(a.category);
         const bIndex = aisleOrder.indexOf(b.category);
         return aIndex - bIndex;
       })
-      .map((p) => p.name);
+      .map((item) => item.name);
   }
 
   const formatInventoryResponse = (categories: string[]) => {
     // Sort categories alphabetically
-    const sortedCategories = categories.sort();
-    return sortedCategories.map(cat => {
-      const products = productDatabase.filter(p => p.category === cat);
+    const sortedCategories = [...categories].sort();
+    return sortedCategories.map((cat: string) => {
+      const goods = shoppingList.filter((item) => item.category === cat);
       const categoryName = cat.replace(/([A-Z])/g, ' $1').trim(); // Add spaces between camelCase
-      return `📦 ${categoryName}:\n${products.map(p => `• ${p.name} - ${p.price}`).join('\n')}`;
+      return `📦 ${categoryName}:\n${goods.map((item) => `• ${item.name} - $${item.price}`).join('\n')}`;
     }).join('\n\n');
   };
 
+  // Auto scroll to bottom when new messages arrive
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [messages]);
+
+  // Update system prompt when shopping list changes
+  useEffect(() => {
+    setMessages(prev => [
+      getSystemPrompt(shoppingList),
+      ...prev.slice(1)
+    ]);
+  }, [shoppingList]);
+
+  // Extract items from AI response
+  const extractItemsFromResponse = (response: string): string[] => {
+    const itemRegex = /add(?:ed|ing)?\s+([^.!?]+)(?:to your list|to the list)?/i;
+    const match = response.match(itemRegex);
+    if (match) {
+      return match[1].split(/,|\sand\s/).map(item => item.trim());
+    }
+    return [];
+  };
+
+  const findGood = async (name: string): Promise<Good | null> => {
+    try {
+      // We can use the existing searchGoods function from appwrite.ts
+      const results = await searchGoods(name);
+      if (results.length > 0) {
+        const doc = results[0];
+        if (
+          'name' in doc &&
+          'category' in doc &&
+          'imageId' in doc &&
+          'price' in doc &&
+          'rating' in doc
+        ) {
+          return doc as Good;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error searching for good:', error);
+      return null;
+    }
+  };
 
   const sendMessage = async () => {
     if (!input.trim()) return;
-
     if (!API_KEY) {
       setError("API key is missing. Please check your environment variables.");
       return;
     }
 
+    const userMessage: Message = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsTyping(true);
     setError(null);
 
-    const userMessage: Message = { role: 'user', content: input };
-    const newMessages = [...messages, userMessage];
-
-    setMessages(newMessages);
-    setInput('');
-
     try {
-      // Check if the message is asking about inventory
-      const isInventoryQuestion = input.toLowerCase().includes('do you have') || 
-                                input.toLowerCase().includes('in stock') ||
-                                input.toLowerCase().includes('available') ||
-                                input.toLowerCase().includes('what items') ||
-                                input.toLowerCase().includes("what's in stock") ||
-                                input.toLowerCase().includes('what do you have') ||
-                                input.toLowerCase().includes('show inventory') ||
-                                input.toLowerCase().includes('show products');
-
-      if (isInventoryQuestion) {
-        let response: string;
-        
-        // Check if asking for full inventory
-        if (input.toLowerCase().includes('what items') ||
-            input.toLowerCase().includes("what's in stock") ||
-            input.toLowerCase().includes('what do you have') ||
-            input.toLowerCase().includes('show inventory') ||
-            input.toLowerCase().includes('show products')) {
-          const categories = [...new Set(productDatabase.map(p => p.category))];
-          response = `🏪 Our Current Inventory:\n\n${formatInventoryResponse(categories)}\n\n💡 All items are in stock and ready for purchase. Let me know if you'd like to add any items to your shopping list!`;
-        } else {
-          // Check specific item availability
-          const itemToCheck = input.toLowerCase()
-            .replace('do you have ', '')
-            .replace('is ', '')
-            .replace(' in stock', '')
-            .replace('available', '')
-            .replace('?', '')
-            .trim();
-
-          const product = productDatabase.find(p => 
-            p.name.toLowerCase().includes(itemToCheck)
-          );
-
-          if (product) {
-            response = `✅ Yes, ${product.name} is in stock and available for ${product.price}! Would you like me to add it to your shopping list?`;
-          } else {
-            const categories = [...new Set(productDatabase.map(p => p.category))];
-            response = `I'm not sure about that specific item, but here's our full inventory:\n\n${formatInventoryResponse(categories)}`;
-          }
-        }
-
-        const botMessage: Message = {
-          role: 'assistant',
-          content: response
-        };
-        setMessages([...newMessages, botMessage]);
-        return;
-      }
-
-      const prompt = `
-You are a shopping assistant. Extract product names from this sentence and return only a JSON array, like ["milk", "bread"]. 
-DO NOT include explanations, formatting, or markdown. Only return raw JSON.
-
-Sentence: "${input}"
-`;
-
-      // Add request logging
-      console.log("🚀 Sending request to OpenAI...");
+      // Include current shopping list state in the conversation
+      const currentMessages = [
+        getSystemPrompt(shoppingList),
+        ...messages.slice(1),
+        userMessage
+      ];
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -204,153 +203,200 @@ Sentence: "${input}"
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0,
-          max_tokens: 100,
+          messages: currentMessages,
+          temperature: 0.7,
+          max_tokens: 150,
+          presence_penalty: 0.6,
+          frequency_penalty: 0.2,
         }),
       });
 
-      // Add response status check
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❌ API Error:", errorData);
-        throw new Error(`API error: ${errorData.error?.message || 'Unknown error'}`);
+        throw new Error(errorData.error?.message || 'Failed to get response');
       }
 
       const data = await response.json();
-      console.log("✅ Response received:", data);
-
-      const rawContent = data.choices?.[0]?.message?.content?.trim() || '';
-      console.log('🧠 Full GPT Response:', rawContent);
-
-      // Clean up markdown wrappers if GPT includes them
-      let cleaned = rawContent.replace(/^```(json)?\n?/, '').replace(/```$/, '').trim();
-
-      if (!cleaned || cleaned.length < 3) {
-        throw new Error("Response was empty or too short.");
+      const aiResponse = data.choices[0]?.message?.content || '';
+      
+      // Extract any items mentioned in the response
+      const newItems = extractItemsFromResponse(aiResponse);
+      if (newItems.length > 0) {
+        await addToShoppingList(newItems);
       }
 
-      let parsed: string[] = [];
-
-      try {
-        parsed = JSON.parse(cleaned);
-        if (!Array.isArray(parsed)) throw new Error("Not an array");
-      } catch (err) {
-        console.error("❌ Could not parse GPT JSON:", cleaned);
-        setError('The AI response couldn’t be read. Try saying something simpler like “Add milk and bread.”');
-        return;
-      }
-
-      const newItems = parsed.map((item: string) => item.trim().toLowerCase());
-      const updatedList = [...new Set([...shoppingList, ...newItems])];
-      const optimized = optimizeList(updatedList);
-
-      setShoppingList(updatedList);
-      setOptimizedRoute(optimized);
-
-      const botMessage: Message = {
+      const assistantMessage: Message = {
         role: 'assistant',
-        content: `🛒 Added: ${newItems.join(', ')}\n\n📍 Optimal Route:\n${optimized.join(' → ')}`,
+        content: aiResponse,
       };
+      setMessages(prev => [...prev, assistantMessage]);
 
-      setMessages([...newMessages, botMessage]);
     } catch (err) {
-      console.error("❌ sendMessage error:", err);
+      console.error("Error in sendMessage:", err);
       setError(err instanceof Error ? err.message : 'Failed to communicate with AI service');
+    } finally {
+      setIsTyping(false);
     }
   };
 
-  const dismissKeyboard = () => {
-    Keyboard.dismiss();
-  };
-
   return (
-    <SafeAreaView className="h-full bg-white">
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-32 px-7"
-        ref={scrollViewRef}
-        onScrollBeginDrag={dismissKeyboard}
+    <SafeAreaView className="flex-1 bg-white">
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View className="flex flex-row items-center justify-between mt-5">
-          <Text className="text-xl font-rubik-bold">Explore</Text>
-        </View>
-
-        {loading ? (
-          <Text className="text-center text-gray-500 mt-5">Loading user...</Text>
-        ) : isLogged && user ? (
-          <View className="flex flex-row items-center mt-5">
-            <Image
-              source={{ uri: user.avatar }}
-              className="size-10 rounded-full mr-2"
-            />
-            <Text className="text-lg font-rubik-medium text-black-300">
-              Hello, {user.name}!
-            </Text>
+        <View className="flex-1">
+          {/* Header */}
+          <View className="px-5 py-3 border-b border-gray-100">
+            <Text className="text-xl font-rubik-bold text-black-300">Magnolia</Text>
+            {isLogged && user && (
+              <View className="flex-row items-center mt-2">
+                <Image
+                  source={{ uri: user.avatar }}
+                  className="w-6 h-6 rounded-full"
+                />
+                <Text className="ml-2 text-sm font-rubik text-black-200">
+                  Shopping as {user.name}
+                </Text>
+              </View>
+            )}
           </View>
-        ) : (
-          <Text className="text-center text-gray-500 mt-5">
-            You are not logged in.
-          </Text>
-        )}
 
-        {error && (
-          <Text className="text-center text-red-500 mt-5">{error}</Text>
-        )}
-
-        <View className="mt-5">
-          {messages.map((item, index) => (
-            <View
-              key={index}
-              className={`p-3 m-1 rounded-lg ${
-                item.role === 'user'
-                  ? 'bg-blue-100 self-end'
-                  : 'bg-gray-100 self-start'
-              }`}
-            >
-              <Text className="text-black-300 font-rubik">{item.content}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View className="mt-5">
-          <Text className="text-base font-rubik-bold mb-2 text-black-300">
-            🛒 Current List:
-          </Text>
-          {shoppingList.map((item, i) => (
-            <Text key={i} className="text-sm text-black-100 ml-2">• {item}</Text>
-          ))}
-
-          <Text className="text-base font-rubik-bold mt-4 mb-2 text-black-300">
-            📍 Optimized Route:
-          </Text>
-          {optimizedRoute.map((item, i) => (
-            <Text key={i} className="text-sm text-black-100 ml-2">→ {item}</Text>
-          ))}
-        </View>
-      </ScrollView>
-
-      <View
-        className="absolute left-0 right-0 px-7 w-full border-t border-primary-200 bg-white py-4"
-        style={{ bottom: 100 }}
-      >
-        <View className="flex-row items-center">
-          <TextInput
-            className="flex-1 p-3 border rounded-lg font-rubik text-black-300"
-            placeholder={isLogged ? 'Type a message...' : 'Log in to chat'}
-            value={input}
-            onChangeText={setInput}
-            editable={isLogged}
-          />
-          <TouchableOpacity
-            className={`ml-2 p-3 ${isLogged ? 'bg-green-500' : 'bg-gray-400'} rounded-lg`}
-            onPress={sendMessage}
-            disabled={!isLogged}
+          {/* Chat Messages */}
+          <ScrollView
+            ref={scrollViewRef}
+            className="flex-1 px-5"
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 90 : 0 }}
           >
-            <Text className="text-white font-rubik-bold">Send</Text>
-          </TouchableOpacity>
+            {messages.slice(1).map((msg, index) => (
+              <View
+                key={index}
+                className={`my-2 max-w-[85%] ${
+                  msg.role === 'user' ? 'self-end ml-auto' : 'self-start'
+                }`}
+              >
+                <View className="flex-row items-end">
+                  {msg.role === 'assistant' && (
+                    <Image 
+                      source={images.icon}
+                      className="w-6 h-6 rounded-full mr-2 mb-1"
+                    />
+                  )}
+                  <View
+                    className={`rounded-2xl p-3 ${
+                      msg.role === 'user'
+                        ? 'bg-primary-300'
+                        : 'bg-gray-100'
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-rubik ${
+                        msg.role === 'user' ? 'text-white' : 'text-black-300'
+                      }`}
+                    >
+                      {msg.content}
+                    </Text>
+                  </View>
+                  {msg.role === 'user' && (
+                    <Image 
+                      source={{ uri: user?.avatar }}
+                      className="w-6 h-6 rounded-full ml-2 mb-1"
+                    />
+                  )}
+                </View>
+              </View>
+            ))}
+
+            {isTyping && (
+              <View className="self-start my-2">
+                <View className="flex-row items-end">
+                  <Image 
+                    source={images.icon}
+                    className="w-6 h-6 rounded-full mr-2 mb-1"
+                  />
+                  <View className="bg-gray-100 rounded-2xl p-3">
+                    <ActivityIndicator size="small" color="#32a852" />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Shopping List Display */}
+            {shoppingList.length > 0 && (
+              <View className="my-4 p-4 bg-gray-50 rounded-lg">
+                <View className="flex-row justify-between items-center mb-2">
+                  <Text className="text-base font-rubik-bold text-black-300">
+                    🛒 Shopping List:
+                  </Text>
+                  <Link href="/list" asChild>
+                    <TouchableOpacity>
+                      <Text className="text-sm font-rubik text-primary-300">
+                        View Full List →
+                      </Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+                {shoppingList.map((item, i) => (
+                  <Link
+                    key={i}
+                    href={`/product/${item.id}`}
+                    asChild
+                  >
+                    <TouchableOpacity className="mb-2">
+                      <Text className="text-sm text-black-200 font-rubik">
+                        • {item.name} - ${item.price} ({item.category})
+                      </Text>
+                    </TouchableOpacity>
+                  </Link>
+                ))}
+                <Text className="text-sm font-rubik-bold text-black-300 mt-2">
+                  Total: ${shoppingList.reduce((sum, item) => sum + item.price, 0).toFixed(2)}
+                </Text>
+              </View>
+            )}
+
+            {error && (
+              <View className="my-2 p-3 bg-red-100 rounded-lg">
+                <Text className="text-sm text-red-600">{error}</Text>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Input Area */}
+          <View className="absolute bottom-0 left-0 right-0 px-4 pb-4 border-t border-gray-100 bg-white">
+            <View className="flex-row items-center bg-gray-50 rounded-full px-4 mt-2">
+              <TextInput
+                className="flex-1 py-3 text-base font-rubik text-black-300"
+                placeholder={isLogged ? "Type your message..." : "Log in to chat"}
+                value={input}
+                onChangeText={setInput}
+                editable={isLogged}
+                multiline
+                maxLength={500}
+                returnKeyType="send"
+                onSubmitEditing={sendMessage}
+              />
+              <TouchableOpacity
+                onPress={sendMessage}
+                disabled={!isLogged || !input.trim()}
+                className={`ml-2 p-2 rounded-full ${
+                  !isLogged || !input.trim() ? 'opacity-50' : ''
+                }`}
+              >
+                <Image 
+                  source={icons.send} 
+                  className="w-6 h-6"
+                  style={{ tintColor: '#32a852' }}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

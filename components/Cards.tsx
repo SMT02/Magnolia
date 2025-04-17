@@ -3,6 +3,7 @@ import images from "@/constants/images";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Models } from "react-native-appwrite";
 import { storage } from "@/lib/appwrite";
+import { router } from "expo-router";
 
 interface Props {
   item: Models.Document;
@@ -10,9 +11,9 @@ interface Props {
 }
 
 // ✅ Use getFileView instead of getFilePreview (avoids image transformation error)
-const getImageUrl = (bucketId: string, fileId?: string) => {
+const getImageUrl = (fileId?: string) => {
   if (!fileId) return null;
-  return storage.getFileView(bucketId, fileId).href;
+  return storage.getFileView("67bac197000f761b18ca", fileId).href;
 };
 
 const categoryDisplayNames: { [key: string]: string } = {
@@ -28,7 +29,7 @@ const categoryDisplayNames: { [key: string]: string } = {
 };
 
 export const FeaturedCard = ({ item, onPress }: Props) => {
-  const imageUrl = getImageUrl("67bac197000f761b18ca", item.imageId);
+  const imageUrl = getImageUrl(item.imageId);
   const categoryDisplayName = categoryDisplayNames[item.category] || item.category;
 
   return (
@@ -72,14 +73,16 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
 };
 
 export const Card = ({ item, onPress }: Props) => {
-  const imageUrl = getImageUrl("67bac197000f761b18ca", item.imageId);
+  const imageUrl = getImageUrl(item.imageId);
 
   const categoryDisplayName = categoryDisplayNames[item.category] || item.category;
+
+  const handleCardPress = (id: string) => router.push(`/product/${id}`);
 
   return (
     <TouchableOpacity
       className="flex-1 w-full mt-4 px-3 py-4 rounded-lg bg-white shadow-lg shadow-black-100/70 relative"
-      onPress={onPress}
+      onPress={() => handleCardPress(item.$id)}
     >
       <View className="flex flex-row items-center absolute px-2 top-5 right-5 bg-white/90 p-1 rounded-full z-50">
         <Image source={icons.star} className="size-2.5" />

@@ -12,12 +12,11 @@ import * as Linking from "expo-linking";
 import { openAuthSessionAsync } from "expo-web-browser";
 
 export const config = {
-  platform: "com.jsm.foodapp", // Updated platform name
+  platform: "com.jsm.foodapp",
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
   projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
-  goodsCollectionId:
-    process.env.EXPO_PUBLIC_APPWRITE_GOODS_COLLECTION_ID, // Updated collection name
+  goodsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_GOODS_COLLECTION_ID,
   bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID,
 };
 
@@ -79,13 +78,11 @@ export async function getCurrentUser() {
     const result = await account.get();
     if (result.$id) {
       const userAvatar = avatar.getInitials(result.name);
-
       return {
         ...result,
         avatar: userAvatar.toString(),
       };
     }
-
     return null;
   } catch (error) {
     console.log(error);
@@ -100,7 +97,6 @@ export async function getLatestGoods() {
       config.goodsCollectionId!,
       [Query.orderAsc("$createdAt"), Query.limit(5)]
     );
-
     return result.documents;
   } catch (error) {
     console.error(error);
@@ -127,7 +123,7 @@ export async function getGoods({
       buildQuery.push(
         Query.or([
           Query.search("name", query),
-          Query.search("description", query), // Updated search fields
+          Query.search("description", query),
           Query.search("category", query),
         ])
       );
@@ -147,25 +143,62 @@ export async function getGoods({
   }
 }
 
-// Write function to get good by ID
 export async function getGoodsById({ id }: { id: string }) {
   try {
-    // Use a filter to match the custom `id` attribute
     const result = await databases.listDocuments(
       config.databaseId!,
       config.goodsCollectionId!,
-      [Query.equal("id", parseInt(id))] // Use `parseInt` to convert the string back to an integer
+      [Query.equal("id", parseInt(id))]
     );
 
-    // Return the first document if found
     if (result.documents.length > 0) {
       return result.documents[0];
     }
-
-    // If no matching documents are found, return null
     return null;
   } catch (error) {
     console.error(error);
     return null;
   }
 }
+
+export async function searchGoods(query: string) {
+  try {
+    const result = await databases.listDocuments(
+      config.databaseId!,
+      config.goodsCollectionId!,
+      [
+        Query.search('name', query),
+        Query.limit(20)
+      ]
+    );
+    return result.documents;
+  } catch (error) {
+    console.error('Error searching goods:', error);
+    return [];
+  }
+}
+
+export async function getGoodsByCategory(category: string) {
+  try {
+    const result = await databases.listDocuments(
+      config.databaseId!,
+      config.goodsCollectionId!,
+      [Query.equal('category', category)]
+    );
+    return result.documents;
+  } catch (error) {
+    console.error('Error fetching goods by category:', error);
+    return [];
+  }
+}
+
+export interface Good {
+  $id: string;
+  name: string;
+  category: string;
+  imageId: string;
+  price: number;
+  rating: number;
+}
+
+export { Query };

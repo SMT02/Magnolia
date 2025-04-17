@@ -52,7 +52,7 @@ const Home = () => {
     });
   }, [params.filter, params.query]);
 
-  const handleCardPress = (id: string) => router.push(`/goods/${id}` as any);
+  const handleCardPress = (id: string) => router.push(`/product/${id}`);
 
   return (
     <SafeAreaView className="h-full bg-white">

@@ -1,10 +1,13 @@
 import { useEffect } from "react";
-import { Stack } from "expo-router";
+import { Stack, Slot } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 
 import "./global.css";
 import GlobalProvider from "@/lib/global-provider";
+import { ShoppingListProvider } from "@/lib/shopping-list-provider";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -27,8 +30,13 @@ export default function RootLayout() {
   }
 
   return (
-    <GlobalProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </GlobalProvider>
+    <SafeAreaProvider>
+      <StatusBar style="dark" />
+      <GlobalProvider>
+        <ShoppingListProvider>
+          <Slot />
+        </ShoppingListProvider>
+      </GlobalProvider>
+    </SafeAreaProvider>
   );
 }
