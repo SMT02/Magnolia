@@ -457,6 +457,7 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 90 : 0 }}
+            style={{ marginBottom: 170}}
           >
             {messages.slice(1).map((msg, index) => (
               <View
@@ -553,10 +554,10 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
           </ScrollView>
 
           {/* Input Area */}
-          <View className="absolute bottom-0 left-0 right-0 px-4 pb-4 border-t border-gray-100 bg-white">
+          <View className="absolute left-0 right-0 px-4 pb-4 border-t border-gray-100 bg-white" style={{ bottom: 100 }}>
             <View className="flex-row items-center bg-gray-50 rounded-full px-4 mt-2">
               <TextInput
-                className="flex-1 py-3 text-base font-rubik text-black-300"
+                className="flex-1 py-3 text-base font-rubik text-black-300 caret-green-600"
                 placeholder={isLogged ? "Type your message..." : "Log in to chat"}
                 value={input}
                 onChangeText={setInput}
