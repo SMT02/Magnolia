@@ -388,7 +388,7 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
       const lastMessage = messagesData.data[0];
       const messageContent = lastMessage.content[0].text.value;
 
-      // Extract product codes and validate them
+      // Extract product codes and validate them .name
       const productCodes = extractProductCodes(messageContent);
       const validProducts = productCodes
         .filter(code => productCodeMap[code])
@@ -435,16 +435,21 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
         <View className="flex-1">
           {/* Header */}
           <View className="px-5 py-3 border-b border-gray-100">
-            <Text className="text-xl font-rubik-bold text-black-300">Magnolia</Text>
+            
             {isLogged && user && (
               <View className="flex-row items-center mt-2">
                 <Image
                   source={{ uri: user.avatar }}
-                  className="w-6 h-6 rounded-full"
+                  className="size-12 rounded-full"
                 />
-                <Text className="ml-2 text-sm font-rubik text-black-200">
-                  Shopping as {user.name}
-                </Text>
+                <View className="ml-3">
+                  <Text className="text-sm font-rubik text-black-200">
+                    Shopping as {user.name}
+                  </Text>
+                  <Text className="text-xl font-rubik-bold text-black-300">
+                    Magnolia
+                  </Text>
+                </View>  
               </View>
             )}
           </View>

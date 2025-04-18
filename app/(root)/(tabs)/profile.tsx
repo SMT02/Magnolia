@@ -68,6 +68,7 @@ const EditProfileModal = ({ visible, onClose, onSave, initialName }: {
 }) => {
   const [name, setName] = useState(initialName);
 
+  // rounded-t-3xl Why? in the second view where the border now is
   return (
     <Modal
       visible={visible}
@@ -76,11 +77,11 @@ const EditProfileModal = ({ visible, onClose, onSave, initialName }: {
       onRequestClose={onClose}
     >
       <View className="flex-1 justify-end">
-        <View className="bg-white rounded-t-3xl p-5">
-          <View className="flex-row justify-between items-center mb-5">
+        <View className="bg-white border-t border-gray-100 p-5"> 
+          <View className="flex-row justify-between items-center mb-5 ">
             <Text className="text-xl font-rubik-bold text-black-300">Edit Profile</Text>
             <TouchableOpacity onPress={onClose}>
-              <Image source={icons.rightArrow} className="size-6 rotate-90" />
+              <Image source={icons.rightArrow} className="size-8 rotate-90" />
             </TouchableOpacity>
           </View>
 
@@ -88,7 +89,7 @@ const EditProfileModal = ({ visible, onClose, onSave, initialName }: {
           <TextInput
             value={name}
             onChangeText={setName}
-            className="bg-gray-50 p-3 rounded-xl font-rubik text-black-300 mb-5"
+            className="bg-gray-50 p-3 rounded-xl font-rubik text-black-300 mb-5 caret-green-600"
             placeholder="Enter your name"
           />
 
@@ -267,12 +268,12 @@ const Profile = () => {
     <SafeAreaView className="h-full bg-white">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-32 px-7"
+        contentContainerClassName="pb-32 px-5"
       >
-        <View className="flex flex-row items-center justify-between mt-5">
+        <View className="flex flex-row items-center justify-between py-5" style={{ marginTop: 58}}>
           <Text className="text-xl font-rubik-bold">Profile</Text>
           <TouchableOpacity onPress={handleNotifications}>
-            <Image source={icons.bell} className="size-5" />
+            <Image source={icons.bell} className="size-6" />
           </TouchableOpacity>
         </View>
 
@@ -284,7 +285,7 @@ const Profile = () => {
                 className="size-44 relative rounded-full"
               />
               <TouchableOpacity 
-                className="absolute bottom-11 right-2 bg-primary-300 rounded-full p-2"
+                className="absolute bottom-0 right-0 bg-primary-300 rounded-full p-2"
                 onPress={() => Alert.alert("Coming Soon", "Profile picture editing will be available in a future update!")}
               >
                 <Image source={icons.edit} className="size-5" tintColor="#fff" />
@@ -292,17 +293,17 @@ const Profile = () => {
             </View>
 
             <TouchableOpacity 
-              className="flex-row items-center mt-2" 
+              className="flex-row items-center mt-4" 
               onPress={() => setIsEditModalVisible(true)}
             >
               <Text className="text-2xl font-rubik-bold">{user?.name}</Text>
-              <Image source={icons.edit} className="size-4 ml-2" />
+              <Image source={icons.edit} className="size-5 ml-2" />
             </TouchableOpacity>
             <Text className="text-sm font-rubik text-black-100 mt-1">{user?.email}</Text>
           </View>
         </View>
 
-        <View className="flex flex-col mt-10">
+        <View className="flex flex-col mt-10 px-2">
           <SettingsItem 
             icon={icons.calendar} 
             title="My Lists" 
@@ -317,7 +318,7 @@ const Profile = () => {
           />
         </View>
 
-        <View className="flex flex-col mt-5 border-t pt-5 border-primary-200">
+        <View className="flex flex-col mt-5 border-t pt-5 px-2 border-primary-200">
           <SettingsItem 
             icon={icons.people} 
             title="Share App" 
@@ -340,7 +341,7 @@ const Profile = () => {
           />
         </View>
 
-        <View className="flex flex-col border-t mt-5 pt-5 border-primary-200">
+        <View className="flex flex-col border-t mt-5 pt-5 px-2 border-primary-200">
           <SettingsItem
             icon={icons.logout}
             title="Logout"
