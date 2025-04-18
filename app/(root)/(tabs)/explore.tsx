@@ -388,7 +388,7 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
       const lastMessage = messagesData.data[0];
       const messageContent = lastMessage.content[0].text.value;
 
-      // Extract product codes and validate them
+      // Extract product codes and validate them .name
       const productCodes = extractProductCodes(messageContent);
       const validProducts = productCodes
         .filter(code => productCodeMap[code])
@@ -435,16 +435,21 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
         <View className="flex-1">
           {/* Header */}
           <View className="px-5 py-3 border-b border-gray-100">
-            <Text className="text-xl font-rubik-bold text-black-300">Magnolia</Text>
+            
             {isLogged && user && (
               <View className="flex-row items-center mt-2">
                 <Image
                   source={{ uri: user.avatar }}
-                  className="w-6 h-6 rounded-full"
+                  className="size-12 rounded-full"
                 />
-                <Text className="ml-2 text-sm font-rubik text-black-200">
-                  Shopping as {user.name}
-                </Text>
+                <View className="ml-3">
+                  <Text className="text-sm font-rubik text-black-200">
+                    Shopping as {user.name}
+                  </Text>
+                  <Text className="text-xl font-rubik-bold text-black-300">
+                    Magnolia
+                  </Text>
+                </View>  
               </View>
             )}
           </View>
@@ -457,6 +462,7 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 90 : 0 }}
+            style={{ marginBottom: 170}}
           >
             {messages.slice(1).map((msg, index) => (
               <View
@@ -553,10 +559,10 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
           </ScrollView>
 
           {/* Input Area */}
-          <View className="absolute bottom-0 left-0 right-0 px-4 pb-4 border-t border-gray-100 bg-white">
+          <View className="absolute left-0 right-0 px-4 pb-4 border-t border-gray-100 bg-white" style={{ bottom: 100 }}>
             <View className="flex-row items-center bg-gray-50 rounded-full px-4 mt-2">
               <TextInput
-                className="flex-1 py-3 text-base font-rubik text-black-300"
+                className="flex-1 py-3 text-base font-rubik text-black-300 caret-green-600"
                 placeholder={isLogged ? "Type your message..." : "Log in to chat"}
                 value={input}
                 onChangeText={setInput}

@@ -155,7 +155,7 @@ const MapScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-32"
       >
-        <View className="px-5">
+        <View className="px-5 py-5 mt-9">
           <View className="flex flex-row items-center justify-between mt-5">
             <View className="flex flex-row">
               <Image
@@ -163,11 +163,11 @@ const MapScreen = () => {
                 className="size-12 rounded-full"
               />
               
-              <View className="flex flex-col items-start ml-2 justify-center">
-                <Text className="text-xs font-rubik text-black-100">
+              <View className="flex flex-col items-start ml-3 justify-center">
+                <Text className="text-sm font-rubik text-black-100">
                   {getGreeting()}
                 </Text>
-                <Text className="text-base font-rubik-medium text-black-300">
+                <Text className="text-xl font-rubik-bold text-black-300">
                   {user?.name}
                 </Text>
               </View>

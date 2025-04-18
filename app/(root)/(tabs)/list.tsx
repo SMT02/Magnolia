@@ -37,13 +37,13 @@ const ShoppingList = () => {
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View className="px-5 py-3 flex-row items-center border-b border-gray-100">
+        <View className="px-5 py-5 flex-row items-center border-b border-gray-100">
           <Image 
             source={{ uri: user?.avatar }}
-            className="size-10 rounded-full"
+            className="size-12 rounded-full"
           />
           <View className="ml-3">
-            <Text className="text-xs font-rubik text-black-100">My</Text>
+            <Text className="text-sm font-rubik text-black-100">My</Text>
             <Text className="text-xl font-rubik-bold text-black-300">
               Shopping List
             </Text>
