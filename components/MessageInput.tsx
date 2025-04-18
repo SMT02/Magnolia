@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, TextInput, TouchableOpacity, Platform, Keyboard } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRef, useState } from 'react';
 import icons from '@/constants/icons';
@@ -23,15 +23,7 @@ const MessageInput = ({ onShouldSend, enabled = true }: Props) => {
     if (message.trim() && enabled) {
       onShouldSend(message);
       setMessage('');
-      // Dismiss the keyboard after sending
-      Keyboard.dismiss();
     }
-  };
-
-  const handleSubmitEditing = () => {
-    onSend();
-    // Explicitly dismiss keyboard on submit
-    Keyboard.dismiss();
   };
 
   return (
@@ -47,8 +39,7 @@ const MessageInput = ({ onShouldSend, enabled = true }: Props) => {
           multiline
           maxLength={500}
           returnKeyType="send"
-          blurOnSubmit={true}
-          onSubmitEditing={handleSubmitEditing}
+          onSubmitEditing={onSend}
           editable={enabled}
           className="text-base font-rubik text-black-300 caret-green-600"
         />
@@ -87,7 +78,6 @@ const styles = StyleSheet.create({
     padding: 10,
     borderColor: '#e5e5e5',
     backgroundColor: '#f1f1f1',
-    maxHeight: 100, // Limit height for very long messages
   },
   disabledInput: {
     backgroundColor: '#f9f9f9',
