@@ -2,28 +2,28 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   ScrollView,
   TouchableOpacity,
   Image,
-  Keyboard,
-  KeyboardAvoidingView,
   Platform,
+  KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlobalContext } from '@/lib/global-provider';
-import icons from '@/constants/icons';
 import { config, databases } from '@/lib/appwrite';
 import { Models } from "react-native-appwrite";
-import { searchGoods } from '@/lib/appwrite';
 import { Link } from 'expo-router';
 import { useShoppingList } from "@/lib/shopping-list-provider";
 import images from "@/constants/images";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Query } from "appwrite";
+import ChatMessage from '@/components/ChatMessage';
+import MessageInput from '@/components/MessageInput';
+import MessageIdeas from '@/components/MessageIdeas';
+import ShoppingListPreview from '@/components/ShoppingListPreview';
 
-const API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+const API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || '';
 console.log("🔑 Loaded API KEY:", API_KEY);
 
 // Add better API key validation
@@ -54,6 +54,7 @@ CORE RESPONSIBILITIES:
 - Suggest complementary items based on what's already in their list
 - Remember items mentioned throughout the conversation
 - Confirm additions/removals naturally and conversationally
+- CRUCIAL: When adding items to the list, ALWAYS INCLUDE the product code [P#] - this is REQUIRED for the system to work
 
 2. Product Knowledge
 - Provide detailed information about products (price, location, availability)
@@ -72,18 +73,34 @@ CONVERSATION STYLE:
 - Address users by name when available
 
 RESPONSE EXAMPLES:
-✅ "I'll add that milk to your list! Since you're in dairy, would you also need some eggs?"
-✅ "You're picking up pasta—would you like some marinara sauce too? It's on sale!"
-✅ "You'll find the bread in our Bakery section near the front. By the way, our croissants are freshly baked this morning!"
+✅ "I'll add that milk [P12] to your list! Since you're in dairy, would you also need some eggs [P24]?"
+✅ "You're picking up pasta [P45]—would you like some marinara sauce [P52] too? It's on sale!"
+✅ "You'll find the bread [P31] in our Bakery section near the front. By the way, our croissants [P33] are freshly baked this morning!"
+
+PRODUCT MENTION GUIDELINES:
+- When referring to products, ALWAYS use the EXACT name as it appears in our inventory
+- For example, say "Frozen Pizza" not just "pizza" if the product name is "Frozen Pizza"
+- Be precise with product names to ensure the system correctly identifies what to add
+- Use the FULL product name consistently throughout the conversation
+- Example: Use "Frozen Pizza [P18]" not just "pizza" if the product is called "Frozen Pizza"
+
+HOW TO USE PRODUCT CODES:
+1. For every product you want to add to the list, include the [P#] code ONCE in your message
+2. The code should appear right after the first mention of the product
+3. Example: "I've added Frozen Pizza [P18] to your list, it's in the Frozen Foods section."
+4. After using the code once, you can refer to the product without the code
+5. Format: ProductName [P#] - with no space between P and the number
 
 CRITICAL RULES:
-1. NEVER show or mention the [P1], [P2] product codes to users
-2. Only suggest products that exist in our inventory
-3. If a product isn't in our inventory, say "I apologize, but I don't see that product in our current inventory. Would you like to see what similar products we have available?"
-4. Keep track of the shopping list and suggest complementary items
-5. Mention relevant deals and promotions
-6. Group items by department when possible
-7. Be helpful and friendly, but don't make assumptions about product availability
+1. When adding products to the list, YOU MUST INCLUDE THE PRODUCT CODE [P#] SOMEWHERE in your message
+2. The [P#] codes should NOT be visible to users in your displayed response
+3. Only suggest products that exist in our inventory
+4. If a product isn't in our inventory, say "I apologize, but I don't see that product in our current inventory. Would you like to see what similar products we have available?"
+5. Keep track of the shopping list and suggest complementary items
+6. Mention relevant deals and promotions
+7. Group items by department when possible
+8. Be helpful and friendly, but don't make assumptions about product availability
+9. Always use COMPLETE product names as they appear in our system
 
 PRIVACY & SECURITY:
 - Do not share personal customer data
@@ -140,13 +157,6 @@ const formatProductList = (products: any[]) => {
   });
 };
 
-// Extract product codes from response
-const extractProductCodes = (response: string): string[] => {
-  const codeRegex = /\[P\d+\]/g;
-  const matches = response.match(codeRegex) || [];
-  return matches;
-};
-
 // Function to refresh thread
 const refreshThread = async (apiKey: string) => {
   try {
@@ -162,6 +172,282 @@ const refreshThread = async (apiKey: string) => {
   }
 };
 
+// Function to handle product extraction and addition to shopping list
+const handleProductsInResponse = async (messageContent: string, productCodeMap: Record<string, any>, addToShoppingList: (products: string[]) => Promise<void>) => {
+  console.log("⏳ Analyzing message for products...");
+  console.log("📝 Message content length:", messageContent.length);
+  console.log("📝 First 100 chars:", messageContent.substring(0, 100));
+  console.log("📝 Last 100 chars:", messageContent.substring(messageContent.length - 100));
+  
+  // Track products that have been added in this conversation turn
+  // to prevent duplicate additions from the AI response
+  const addedProducts = new Set<string>();
+  
+  try {
+    // Try different regex patterns to find product codes
+    const patterns = [
+      /\[P(\d+)\]/g,  // Standard [P123] format
+      /\[P\s*(\d+)\]/g,  // With possible space [P 123]
+      /P(\d+)/g,  // Without brackets P123
+      /Product\s*(\d+)/ig,  // With "Product" prefix
+    ];
+    
+    let productIds: string[] = [];
+    
+    // Try each pattern
+    for (const pattern of patterns) {
+      let match;
+      const currentIds: string[] = [];
+      
+      // Create a copy of the string for this regex
+      const contentCopy = messageContent.slice();
+      
+      // Extract all product codes using regex
+      while ((match = pattern.exec(contentCopy)) !== null) {
+        const productId = match[1]; // Get the number inside pattern
+        currentIds.push(productId);
+      }
+      
+      if (currentIds.length > 0) {
+        console.log(`🔍 Found ${currentIds.length} product IDs with pattern ${pattern}:`, currentIds);
+        productIds = [...productIds, ...currentIds];
+      }
+    }
+    
+    // Deduplicate product IDs
+    productIds = [...new Set(productIds)];
+    console.log("🔍 Total unique product IDs found:", productIds);
+    
+    if (productIds.length > 0) {
+      // Map product IDs to product codes [P#]
+      const productCodes = productIds.map(id => `[P${id}]`);
+      console.log("🏷️ Product codes to check:", productCodes);
+      
+      // Log all available product codes for debugging
+      console.log("🗂️ Available product codes:", Object.keys(productCodeMap).length);
+      console.log("🗂️ Sample available codes:", Object.keys(productCodeMap).slice(0, 5));
+      
+      // Filter valid products and get their names
+      const validProducts = productCodes
+        .filter(code => {
+          const hasProduct = !!productCodeMap[code];
+          if (!hasProduct) {
+            console.log(`⚠️ Product code ${code} not found in product map`);
+          }
+          return hasProduct;
+        })
+        .map(code => {
+          console.log(`✅ Found product ${code}:`, productCodeMap[code].name);
+          return productCodeMap[code].name;
+        });
+      
+      console.log("🛒 Products to add:", validProducts);
+      
+      if (validProducts.length > 0) {
+        // Track added products to prevent duplications
+        validProducts.forEach(product => addedProducts.add(product.toLowerCase()));
+        
+        try {
+          await addToShoppingList(validProducts);
+          console.log("✅ Successfully added products to shopping list");
+        } catch (error) {
+          console.error("❌ Error adding products to shopping list:", error);
+        }
+      } else {
+        console.log("⚠️ No valid products found from extracted codes");
+      }
+    } else {
+      console.log("ℹ️ No product codes found in message");
+      
+      // IMPROVED PRODUCT NAME DETECTION
+      // Extract potential product mentions using a more sophisticated approach
+      console.log("🔍 Using improved product name detection...");
+      
+      // 1. Extract all words and phrases from the message that might be products
+      const lowerCaseContent = messageContent.toLowerCase();
+      const productsByRelevance: Array<{name: string, score: number}> = [];
+      
+      // 2. For each product in our inventory, calculate a relevance score
+      for (const product of Object.values(productCodeMap)) {
+        const productName = product.name;
+        const lowerCaseName = productName.toLowerCase();
+        
+        // Skip very short product names (less than 3 chars) to avoid false positives
+        if (lowerCaseName.length < 3) continue;
+        
+        // Check for exact match first (highest priority)
+        if (lowerCaseContent.includes(lowerCaseName)) {
+          // Calculate how specific the match is (longer names = more specific)
+          // and how many times it appears in the message
+          const occurrences = (lowerCaseContent.match(new RegExp(`\\b${lowerCaseName}\\b`, 'gi')) || []).length;
+          const score = lowerCaseName.length * 10 + (occurrences * 5);
+          
+          console.log(`🎯 Exact match for "${productName}" with score ${score}`);
+          productsByRelevance.push({name: productName, score});
+          continue;
+        }
+        
+        // For multi-word product names, check if all words are present
+        // For example, "Frozen Pizza" should match if both "frozen" and "pizza" are present
+        const words: string[] = lowerCaseName.split(' ');
+        if (words.length > 1) {
+          const allWordsPresent = words.every(word => {
+            // Skip very short words
+            if (word.length < 3) return true;
+            return lowerCaseContent.includes(word);
+          });
+          
+          if (allWordsPresent) {
+            // Calculate score based on how close the words are in the message
+            const score = lowerCaseName.length * 5;
+            console.log(`✅ All words present for "${productName}" with score ${score}`);
+            productsByRelevance.push({name: productName, score});
+            continue;
+          }
+        }
+        
+        // Check for partial matches (lower priority)
+        // Only consider if the product name is longer than 4 characters
+        // to avoid matches like "a" or "the"
+        if (lowerCaseName.length > 4) {
+          // For product names like "Frozen Pizza", check if "pizza" is mentioned
+          for (const word of words) {
+            if (word.length > 3 && lowerCaseContent.includes(word)) {
+              // Calculate a more sophisticated score for partial matches
+              let score = word.length * 2;
+              
+              // If this is a key product word (like "pizza" in "Frozen Pizza"),
+              // it should get a higher score than generic words
+              const isKeyWord = word.length > 4 && !['with', 'and', 'the'].includes(word);
+              if (isKeyWord) {
+                // Word boundary matches are much stronger signals
+                const wordBoundaryRegex = new RegExp(`\\b${word}\\b`, 'i');
+                if (wordBoundaryRegex.test(lowerCaseContent)) {
+                  score += 15; // Significant boost for exact word matches
+                  
+                  // Check if the user specifically requested this product
+                  // Using patterns like "add X" or "I want X" or "X please"
+                  const requestPatterns = [
+                    new RegExp(`add\\s+.*?\\b${word}\\b`, 'i'),
+                    new RegExp(`want\\s+.*?\\b${word}\\b`, 'i'),
+                    new RegExp(`\\b${word}\\b.*?please`, 'i'),
+                    new RegExp(`some\\s+.*?\\b${word}\\b`, 'i'),
+                  ];
+                  
+                  if (requestPatterns.some(pattern => pattern.test(lowerCaseContent))) {
+                    score += 20; // Extra boost for explicit requests
+                    console.log(`🎯 User seems to be specifically requesting "${word}" in "${productName}"`);
+                  }
+                }
+              }
+              
+              // If the word appears multiple times, it's more likely to be relevant
+              const wordOccurrences = (lowerCaseContent.match(new RegExp(word, 'gi')) || []).length;
+              if (wordOccurrences > 1) {
+                score += wordOccurrences * 3;
+              }
+              
+              console.log(`🔍 Partial match on word "${word}" for "${productName}" with score ${score}`);
+              productsByRelevance.push({name: productName, score});
+              break;
+            }
+          }
+        }
+      }
+      
+      // Sort by relevance score (highest first)
+      productsByRelevance.sort((a, b) => b.score - a.score);
+      
+      // Log top matches
+      console.log("🏆 Top matching products by relevance:");
+      productsByRelevance.slice(0, 5).forEach((p, i) => {
+        console.log(`  ${i+1}. ${p.name} (score: ${p.score})`);
+      });
+      
+      // Extract the product name from the HIGHEST-scoring match only
+      // Only take the top product instead of multiple products
+      let productToAdd: string | null = null;
+      
+      if (productsByRelevance.length > 0) {
+        const topProduct = productsByRelevance[0];
+        // Only consider if score is high enough
+        if (topProduct.score > 15) {
+          productToAdd = topProduct.name;
+          console.log(`🥇 Selected top product: "${productToAdd}" with score ${topProduct.score}`);
+          
+          // Check if there's a second product with a very close score
+          // If so, prefer products that match the first word of user's query
+          if (productsByRelevance.length > 1) {
+            const secondProduct = productsByRelevance[1];
+            console.log(`🥈 Second best product: "${secondProduct.name}" with score ${secondProduct.score}`);
+            
+            // If the scores are very close (within 20%), check if one is a better match for the user's query
+            if (secondProduct.score > topProduct.score * 0.8) {
+              console.log(`⚖️ Scores are very close, refining selection...`);
+              
+              // Get the first few words of the user message to compare against
+              const userMessage = messageContent.toLowerCase().split(/[^\w]+/).filter(w => w.length > 2).slice(0, 3);
+              console.log(`🗣️ User message starting words: ${userMessage.join(', ')}`);
+              
+              // Check if either product name contains any of these words
+              const topProductWords = topProduct.name.toLowerCase().split(/\s+/);
+              const secondProductWords = secondProduct.name.toLowerCase().split(/\s+/);
+              
+              const topMatchesUserStart = userMessage.some(word => 
+                topProductWords.some(prodWord => prodWord.includes(word) || word.includes(prodWord))
+              );
+              
+              const secondMatchesUserStart = userMessage.some(word => 
+                secondProductWords.some(prodWord => prodWord.includes(word) || word.includes(prodWord))
+              );
+              
+              // If the second product matches the user query better, choose it instead
+              if (secondMatchesUserStart && !topMatchesUserStart) {
+                productToAdd = secondProduct.name;
+                console.log(`🔄 Changed selection to: "${productToAdd}" - better match for user query`);
+              }
+            }
+          }
+        }
+      }
+      
+      if (productToAdd) {
+        console.log(`🛒 Product found by intelligent name matching: "${productToAdd}"`);
+        
+        // Skip if we've already added this product in this conversation turn
+        if (addedProducts.has(productToAdd.toLowerCase())) {
+          console.log(`⚠️ Skipping "${productToAdd}" as it was already added in this conversation turn`);
+          return;
+        }
+        
+        // Check for request words/phrases in the message that indicate user intent to add products
+        const additionIndicators = ['add', 'want', 'need', 'put', 'include', 'get me', 'give me', 'buy'];
+        const messageHasAddRequest = additionIndicators.some(indicator => 
+          lowerCaseContent.includes(indicator)
+        );
+
+        // Only add products when there's clear intent
+        if (messageHasAddRequest || productsByRelevance[0]?.score > 30) {
+          try {
+            // Add only the single product with highest confidence
+            addedProducts.add(productToAdd.toLowerCase());
+            await addToShoppingList([productToAdd]);
+            console.log(`✅ Successfully added product "${productToAdd}" to shopping list`);
+          } catch (error) {
+            console.error(`❌ Error adding product "${productToAdd}" to shopping list:`, error);
+          }
+        } else {
+          console.log(`⚠️ Found potential product match (${productToAdd}) but no clear intent to add it to cart`);
+        }
+      } else {
+        console.log("❌ No confident product match found in the message");
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error in handleProductsInResponse:", error);
+  }
+};
+
 const Explore = () => {
   const { isLogged, user, loading } = useGlobalContext();
   const { shoppingList, addToShoppingList } = useShoppingList();
@@ -172,9 +458,9 @@ const Explore = () => {
       content: "Hi! I'm your Magnolia shopping assistant. How can I help you today?",
     },
   ]);
-  const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [height, setHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const aisleOrder = [
@@ -209,14 +495,6 @@ const Explore = () => {
     }).join('\n\n');
   };
 
-  // Auto scroll to bottom when new messages arrive
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [messages]);
-
   // Update system prompt when shopping list changes
   useEffect(() => {
     setMessages(prev => [
@@ -225,7 +503,22 @@ const Explore = () => {
     ]);
   }, [shoppingList]);
 
-  const sendMessage = async () => {
+  // Auto scroll to bottom when new messages arrive
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [messages]);
+
+  const onLayout = (event: any) => {
+    const { height } = event.nativeEvent.layout;
+    setHeight(height / 2);
+  };
+
+  const sendMessage = async (input: string) => {
     if (!input.trim()) return;
     if (!API_KEY) {
       setError("API key is missing. Please check your environment variables.");
@@ -234,20 +527,29 @@ const Explore = () => {
 
     const userMessage: Message = { role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
-    setInput('');
     setIsTyping(true);
     setError(null);
 
     try {
       // Get all available products first
       const availableProducts = await getAllProducts();
-      console.log("Available products loaded:", availableProducts.length);
+      console.log("🏪 Available products loaded:", availableProducts.length);
       
       // Format products with codes
       const formattedProducts = formatProductList(availableProducts);
+      console.log(`🏷️ Formatted ${formattedProducts.length} products with codes`);
+      
+      // Create a map of product codes to product details
       const productCodeMap = Object.fromEntries(
         formattedProducts.map(p => [p.code, p])
       );
+      
+      // Log a few products to verify mapping
+      const sampleCodes = Object.keys(productCodeMap).slice(0, 3);
+      console.log("🔍 Sample product mapping:");
+      sampleCodes.forEach(code => {
+        console.log(`  ${code} => ${productCodeMap[code].name} ($${productCodeMap[code].price})`);
+      });
 
       // Refresh thread every 10 messages to ensure fresh context
       const messageCount = messages.length;
@@ -256,7 +558,7 @@ const Explore = () => {
       }
 
       // First create a thread if we don't have one
-      let threadId = await AsyncStorage.getItem('thread_id');
+      let threadId = await AsyncStorage.getItem('thread_id') || '';
       
       if (!threadId) {
         console.log("Creating new thread...");
@@ -295,21 +597,31 @@ const Explore = () => {
 
 ${formattedProducts.map(p => p.display).join('\n')}
 
-CRITICAL RULES:
-1. You MUST use product codes [P1], [P2], etc. internally for tracking
-2. NEVER show these codes to users in your responses
-3. Only suggest products from this list
-4. If a product isn't in this list, politely inform the user it's not in stock
-5. Keep your responses natural and conversational
-6. Use the exact product names as listed
-7. Maintain accurate pricing in your responses
+**CRITICALLY IMPORTANT INSTRUCTIONS**:
+1. You MUST use product codes [P1], [P2], etc. in your responses
+2. When adding a product to the shopping list, the [P#] code MUST be included in your message
+3. The product codes are REQUIRED for the system to understand which items to add
+4. Keep these codes in the background of your message, don't make them visible to users
+5. Only suggest products from this list
+6. If a product isn't in this list, politely inform the user it's not in stock
+7. Keep your responses natural and conversational
+8. Use the EXACT product names as listed - this is CRITICAL for the system to work
+9. Maintain accurate pricing in your responses
 
-Example correct responses:
-✅ "I'll add the milk to your list! Would you like some eggs too?"
-✅ "I've found our fresh bread in stock. Would you like me to add it to your list?"
-✅ "I'm sorry, but I don't see that item in our current inventory. Would you like to see some similar products we have available?"
+PRODUCT NAME ACCURACY IS CRITICAL:
+- Always use the FULL product name exactly as shown above
+- For example, use "Frozen Pizza [P18]" not just "pizza" 
+- Product name accuracy directly impacts if the right item gets added to the cart
+- Do not abbreviate, shorten or paraphrase product names
 
-Remember: While you must use the [P_] codes internally for tracking, never show them to users in your responses.`
+Examples of REQUIRED technique (NOT OPTIONAL):
+✅ "I'll add Milk [P5] to your list! It's in the dairy section."
+✅ "Here's some Bread [P22] that would go well with that."
+✅ "Would you like to try our fresh Eggs [P12]? They're on sale."
+❌ "I'll add some milk to your list." (WRONG - missing the product code)
+❌ "Would you like some pizza?" (WRONG - not using the full product name "Frozen Pizza")
+
+IMPORTANT: The [P#] codes MUST be included somewhere in your message - this is the ONLY way items can be added to the shopping list. If you don't include them, the system cannot add items to the list.`
           })
         });
 
@@ -388,15 +700,8 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
       const lastMessage = messagesData.data[0];
       const messageContent = lastMessage.content[0].text.value;
 
-      // Extract product codes and validate them .name
-      const productCodes = extractProductCodes(messageContent);
-      const validProducts = productCodes
-        .filter(code => productCodeMap[code])
-        .map(code => productCodeMap[code].name);
-
-      if (validProducts.length > 0) {
-        await addToShoppingList(validProducts);
-      }
+      // Handle products in the response
+      await handleProductsInResponse(messageContent, productCodeMap, addToShoppingList);
 
       const assistantMessage: Message = {
         role: 'assistant',
@@ -426,170 +731,121 @@ Remember: While you must use the [P_] codes internally for tracking, never show 
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <View className="flex-1">
-          {/* Header */}
-          <View className="px-5 py-3 border-b border-gray-100">
-            
-            {isLogged && user && (
-              <View className="flex-row items-center mt-2">
-                <Image
-                  source={{ uri: user.avatar }}
-                  className="size-12 rounded-full"
-                />
-                <View className="ml-3">
-                  <Text className="text-sm font-rubik text-black-200">
-                    Shopping as {user.name}
-                  </Text>
-                  <Text className="text-xl font-rubik-bold text-black-300">
-                    Magnolia
-                  </Text>
-                </View>  
-              </View>
-            )}
-          </View>
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header */}
+        <View className="px-5 py-3 border-b border-gray-100">
+          {isLogged && user && (
+            <View className="flex-row items-center mt-2">
+              <Image
+                source={{ uri: user.avatar }}
+                className="size-12 rounded-full"
+              />
+              <View className="ml-3">
+                <Text className="text-sm font-rubik text-black-200">
+                  Shopping as {user.name}
+                </Text>
+                <Text className="text-xl font-rubik-bold text-black-300">
+                  Magnolia
+                </Text>
+              </View>  
+            </View>
+          )}
+        </View>
+
+        <View style={{ flex: 1 }} onLayout={onLayout}>
+          {/* Shopping List Preview */}
+          <ShoppingListPreview isFloating={true} />
+
+          {/* Logo when no messages */}
+          {messages.length <= 1 && (
+            <View style={{ 
+              alignSelf: 'center', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              width: 50, 
+              height: 50, 
+              backgroundColor: '#32a852', 
+              borderRadius: 50,
+              marginTop: height / 2 - 100 
+            }}>
+              <Image source={images.icon} style={{ width: 30, height: 30, resizeMode: 'cover' }} />
+            </View>
+          )}
 
           {/* Chat Messages */}
           <ScrollView
             ref={scrollViewRef}
-            className="flex-1 px-5"
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            style={{ 
+              flex: 1,
+              marginHorizontal: 10,
+              zIndex: 1, // Lower z-index than floating elements
+            }}
+            contentContainerStyle={{ 
+              paddingTop: 20, 
+              paddingBottom: 230, // Increased to allow space for input and keyboard
+              paddingHorizontal: 5,
+            }}
             keyboardDismissMode="on-drag"
-            contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 90 : 0 }}
-            style={{ marginBottom: 170}}
+            showsVerticalScrollIndicator={false}
           >
-            {messages.slice(1).map((msg, index) => (
-              <View
+            {messages.slice(1).map((item, index) => (
+              <ChatMessage 
                 key={index}
-                className={`my-2 max-w-[85%] ${
-                  msg.role === 'user' ? 'self-end ml-auto' : 'self-start'
-                }`}
-              >
-                <View className="flex-row items-end">
-                  {msg.role === 'assistant' && (
-                    <Image 
-                      source={images.icon}
-                      className="w-6 h-6 rounded-full mr-2 mb-1"
-                    />
-                  )}
-                  <View
-                    className={`rounded-2xl p-3 ${
-                      msg.role === 'user'
-                        ? 'bg-primary-300'
-                        : 'bg-gray-100'
-                    }`}
-                  >
-                    <Text
-                      className={`text-sm font-rubik ${
-                        msg.role === 'user' ? 'text-white' : 'text-black-300'
-                      }`}
-                    >
-                      {msg.content}
-                    </Text>
-                  </View>
-                  {msg.role === 'user' && (
-                    <Image 
-                      source={{ uri: user?.avatar }}
-                      className="w-6 h-6 rounded-full ml-2 mb-1"
-                    />
-                  )}
-                </View>
-              </View>
+                role={item.role} 
+                content={item.content} 
+                loading={false}
+              />
             ))}
-
-            {isTyping && (
-              <View className="self-start my-2">
-                <View className="flex-row items-end">
-                  <Image 
-                    source={images.icon}
-                    className="w-6 h-6 rounded-full mr-2 mb-1"
-                  />
-                  <View className="bg-gray-100 rounded-2xl p-3">
-                    <ActivityIndicator size="small" color="#32a852" />
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Shopping List Display */}
-            {shoppingList.length > 0 && (
-              <View className="my-4 p-4 bg-gray-50 rounded-lg">
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-base font-rubik-bold text-black-300">
-                    🛒 Shopping List:
-                  </Text>
-                  <Link href="/list" asChild>
-                    <TouchableOpacity>
-                      <Text className="text-sm font-rubik text-primary-300">
-                        View Full List →
-                      </Text>
-                    </TouchableOpacity>
-                  </Link>
-                </View>
-                {shoppingList.map((item, i) => (
-                  <Link
-                    key={i}
-                    href={`/product/${item.id}`}
-                    asChild
-                  >
-                    <TouchableOpacity className="mb-2">
-                      <Text className="text-sm text-black-200 font-rubik">
-                        • {item.name} - ${item.price} ({item.category})
-                      </Text>
-                    </TouchableOpacity>
-                  </Link>
-                ))}
-                <Text className="text-sm font-rubik-bold text-black-300 mt-2">
-                  Total: ${shoppingList.reduce((sum, item) => sum + item.price, 0).toFixed(2)}
-                </Text>
-              </View>
-            )}
-
-            {error && (
-              <View className="my-2 p-3 bg-red-100 rounded-lg">
-                <Text className="text-sm text-red-600">{error}</Text>
-              </View>
-            )}
           </ScrollView>
 
-          {/* Input Area */}
-          <View className="absolute left-0 right-0 px-4 pb-4 border-t border-gray-100 bg-white" style={{ bottom: 100 }}>
-            <View className="flex-row items-center bg-gray-50 rounded-full px-4 mt-2">
-              <TextInput
-                className="flex-1 py-3 text-base font-rubik text-black-300 caret-green-600"
-                placeholder={isLogged ? "Type your message..." : "Log in to chat"}
-                value={input}
-                onChangeText={setInput}
-                editable={isLogged}
-                multiline
-                maxLength={500}
-                returnKeyType="send"
-                onSubmitEditing={sendMessage}
+          {isTyping && (
+            <View style={{ 
+              position: 'absolute', 
+              bottom: 145, 
+              left: 14,
+              zIndex: 800,
+            }}>
+              <ChatMessage 
+                role="assistant" 
+                content="" 
+                loading={true}
               />
-              <TouchableOpacity
-                onPress={sendMessage}
-                disabled={!isLogged || !input.trim()}
-                className={`ml-2 p-2 rounded-full ${
-                  !isLogged || !input.trim() ? 'opacity-50' : ''
-                }`}
-              >
-                <Image 
-                  source={icons.send} 
-                  className="w-6 h-6"
-                  style={{ tintColor: '#32a852' }}
-                />
-              </TouchableOpacity>
             </View>
-          </View>
+          )}
+          
+          {error && (
+            <View className="my-2 mx-5 p-3 bg-red-100 rounded-lg">
+              <Text className="text-sm text-red-600">{error}</Text>
+            </View>
+          )}
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+        {/* Message Input */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 70}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: '100%',
+            marginBottom: 70, // Add bottom margin to account for the tab bar
+            zIndex: 900, // High z-index but below ShoppingListPreview
+            backgroundColor: 'white',
+            borderTopWidth: 1,
+            borderTopColor: '#f0f0f0',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 3,
+            elevation: 3,
+          }}>
+          {messages.length <= 1 && isLogged && <MessageIdeas onSelectCard={sendMessage} />}
+          <MessageInput onShouldSend={sendMessage} enabled={isLogged} />
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 };
 
