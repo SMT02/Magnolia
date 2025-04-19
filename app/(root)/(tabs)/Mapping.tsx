@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   SafeAreaView, 
   View, 
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useGlobalContext } from "@/lib/global-provider";
 import { useShoppingList } from "@/lib/shopping-list-provider";
-import { databases, config } from "@/lib/appwrite";
+import { databases, config, storage } from "@/lib/appwrite";
 import { Query } from "appwrite";
 import icons from "@/constants/icons";
 import Search from '@/components/Search';
@@ -34,13 +34,22 @@ const MapScreen = () => {
   const [departmentProducts, setDepartmentProducts] = useState<any[]>([]);
   const [showProducts, setShowProducts] = useState(false);
   const [showTextExplanation, setShowTextExplanation] = useState(false);
+  const [showItemConfirmation, setShowItemConfirmation] = useState(false);
+  const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
+  const [routeItems, setRouteItems] = useState<any[]>([]);
+  const [currentItemImage, setCurrentItemImage] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
   const { user } = useGlobalContext();
-  const { shoppingList, addToShoppingList } = useShoppingList();
+  const { shoppingList, addToShoppingList, removeFromShoppingList } = useShoppingList();
 
   // Simulate map loading
-  setTimeout(() => {
-    setLoading(false);
-  }, 1000);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleDepartmentPress = async (department: DepartmentName) => {
     setSelectedDepartment(department);
@@ -54,6 +63,172 @@ const MapScreen = () => {
       setShowProducts(true);
     } catch (error) {
       console.error("Error fetching department products:", error);
+    }
+  };
+  
+  // Initialize shopping route when user wants to navigate
+  const startNavigation = async () => {
+    if (shoppingList.length === 0) return;
+    
+    // Group items by department
+    const itemsByDepartment: Record<string, any[]> = {};
+    
+    // Define optimal order to visit departments
+    const optimalOrder: DepartmentName[] = [
+      'FruitsAndVegetables',
+      'Bakery',
+      'Beverages',
+      'PantryStaples',
+      'SnacksAndSweets',
+      'HouseholdEssentials',
+      'FrozenFoods',
+      'DairyAndEggs',
+      'MeatAndSeafood'
+    ];
+    
+    // Find all products for each item in shopping list
+    try {
+      // Get full details for each shopping list item
+      const items = await Promise.all(
+        shoppingList.map(async (item) => {
+          try {
+            const doc = await databases.getDocument(
+              config.databaseId!,
+              config.goodsCollectionId!,
+              item.id
+            );
+            
+            // Group by department
+            const dept = doc.category;
+            if (!itemsByDepartment[dept]) {
+              itemsByDepartment[dept] = [];
+            }
+            itemsByDepartment[dept].push(doc);
+            
+            return doc;
+          } catch (error) {
+            console.error(`Error fetching item ${item.id}:`, error);
+            return null;
+          }
+        })
+      );
+      
+      // Create ordered route following optimal department order
+      const filteredOrder = optimalOrder.filter(dept => itemsByDepartment[dept]?.length > 0);
+      const orderedItems = filteredOrder.flatMap(dept => itemsByDepartment[dept] || []);
+      
+      // Set route items
+      setRouteItems(orderedItems.filter(Boolean));
+      setCurrentRouteIndex(0);
+      setIsNavigating(true);
+      
+      // Show first item confirmation
+      if (orderedItems.length > 0) {
+        await loadItemImage(orderedItems[0]);
+        setSelectedDepartment(orderedItems[0].category);
+        
+        // First show the map in fullscreen with path to first item
+        setMapFullscreen(true);
+        
+        // After a short delay, show the item confirmation
+        setTimeout(() => {
+          setMapFullscreen(false);
+          setShowItemConfirmation(true);
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Error starting navigation:", error);
+    }
+  };
+  
+  // Load image for the current item
+  const loadItemImage = async (item: any) => {
+    if (!item?.imageId) {
+      setCurrentItemImage(null);
+      return;
+    }
+    
+    try {
+      const url = storage.getFileView(
+        "67bac197000f761b18ca",
+        item.imageId
+      );
+      setCurrentItemImage(url.href);
+    } catch (error) {
+      console.error("Error loading image:", error);
+      setCurrentItemImage(null);
+    }
+  };
+  
+  // Move to next item in the route
+  const moveToNextItem = async () => {
+    if (currentRouteIndex >= routeItems.length - 1) {
+      // End of route
+      setIsNavigating(false);
+      setShowItemConfirmation(false);
+      return;
+    }
+    
+    // Move to next item
+    const nextIndex = currentRouteIndex + 1;
+    setCurrentRouteIndex(nextIndex);
+    
+    // Update selected department
+    const nextItem = routeItems[nextIndex];
+    setSelectedDepartment(nextItem.category);
+    
+    // Load image
+    await loadItemImage(nextItem);
+    
+    // Show confirmation
+    setShowItemConfirmation(true);
+  };
+  
+  // Handle when user retrieves item
+  const handleItemRetrieved = () => {
+    // Get current item
+    const currentItem = routeItems[currentRouteIndex];
+    
+    // Mark as retrieved by removing from shopping list
+    removeFromShoppingList(currentItem.$id);
+    
+    // Hide the confirmation modal first
+    setShowItemConfirmation(false);
+    
+    // Check if we have more items to show
+    if (currentRouteIndex < routeItems.length - 1) {
+      // Show fullscreen map with path to next item
+      const timer = setTimeout(() => {
+        // Move to next item first
+        moveToNextItem();
+        // Then show map in fullscreen
+        setMapFullscreen(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // End of shopping list
+      setIsNavigating(false);
+    }
+  };
+  
+  // Handle when user skips item
+  const handleItemSkipped = () => {
+    // Hide the confirmation modal first
+    setShowItemConfirmation(false);
+    
+    // Check if we have more items to show
+    if (currentRouteIndex < routeItems.length - 1) {
+      // Show fullscreen map with path to next item
+      const timer = setTimeout(() => {
+        // Move to next item first
+        moveToNextItem();
+        // Then show map in fullscreen
+        setMapFullscreen(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // End of shopping list
+      setIsNavigating(false);
     }
   };
 
@@ -149,6 +324,20 @@ const MapScreen = () => {
     return directions;
   };
 
+  // Get current item in shopping route
+  const getCurrentItem = () => {
+    if (!isNavigating || currentRouteIndex >= routeItems.length) {
+      return null;
+    }
+    return routeItems[currentRouteIndex];
+  };
+  
+  // Calculate shopping progress percentage
+  const getProgressPercentage = () => {
+    if (routeItems.length === 0) return 0;
+    return Math.round((currentRouteIndex / routeItems.length) * 100);
+  };
+
   return (
     <SafeAreaView className="h-full bg-white">
       <ScrollView
@@ -205,20 +394,34 @@ const MapScreen = () => {
                   shoppingList={shoppingList} 
                   selectedDepartment={selectedDepartment}
                   onDepartmentPress={handleDepartmentPress}
+                  currentNavigationItem={isNavigating ? getCurrentItem() : null}
+                  isFullScreen={mapFullscreen}
+                  setIsFullScreen={setMapFullscreen}
                 />
               </View>
             )}
           </View>
           
-          {/* Text Directions Option */}
-          <TouchableOpacity 
-            onPress={() => setShowTextExplanation(true)}
-            className="flex-row items-center justify-center mt-4"
-          >
-            <Text className="font-rubik text-black-200">Would you like a </Text>
-            <Text className="font-rubik-medium text-primary-300">text explanation</Text>
-            <Text className="font-rubik text-black-200"> instead?</Text>
-          </TouchableOpacity>
+          {/* Navigation Button or Text Directions Option */}
+          <View className="flex-row items-center justify-center mt-4 space-x-2">
+            {shoppingList.length > 0 && (
+              <TouchableOpacity 
+                onPress={startNavigation}
+                className="px-4 py-2 bg-primary-300 rounded-lg"
+              >
+                <Text className="font-rubik-medium text-white">Start Navigation</Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              onPress={() => setShowTextExplanation(true)}
+              className="flex-row items-center justify-center"
+            >
+              <Text className="font-rubik text-black-200">Would you like a </Text>
+              <Text className="font-rubik-medium text-primary-300">text explanation</Text>
+              <Text className="font-rubik text-black-200"> instead?</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Department Products Modal */}
@@ -301,6 +504,109 @@ const MapScreen = () => {
                   {generateTextDirections()}
                 </Text>
               </ScrollView>
+            </View>
+          </View>
+        </Modal>
+        
+        {/* Item Confirmation Modal */}
+        <Modal
+          visible={showItemConfirmation}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowItemConfirmation(false)}
+        >
+          <View className="flex-1 bg-black/50">
+            <View className="flex-1 mt-32 bg-white rounded-t-3xl">
+              <View className="p-5 border-b border-gray-100">
+                <View className="flex-row justify-between items-center">
+                  <View>
+                    <Text className="text-xl font-rubik-bold text-black-300">
+                      Find This Item
+                    </Text>
+                    <Text className="text-sm font-rubik text-black-100 mt-1">
+                      {getCurrentItem()?.category.replace(/([A-Z])/g, ' $1').trim()}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setShowItemConfirmation(false)}>
+                    <Image source={icons.rightArrow} className="size-6 rotate-90" />
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Progress indicator */}
+                <View className="mt-3">
+                  <View className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <View 
+                      className="h-full bg-primary-300 rounded-full" 
+                      style={{ width: `${getProgressPercentage()}%` }}
+                    />
+                  </View>
+                  <Text className="text-xs font-rubik text-black-100 mt-1 text-right">
+                    {currentRouteIndex + 1} of {routeItems.length} items
+                  </Text>
+                </View>
+              </View>
+
+              <View className="p-5 flex-1 items-center justify-between">
+                {/* Product Image */}
+                <View className="w-full items-center justify-center">
+                  {currentItemImage ? (
+                    <Image 
+                      source={{ uri: currentItemImage }}
+                      className="w-40 h-40 rounded-lg"
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View className="w-40 h-40 rounded-lg bg-gray-100 items-center justify-center">
+                      <Text className="font-rubik text-gray-400">No image available</Text>
+                    </View>
+                  )}
+                  
+                  <Text className="text-xl font-rubik-bold text-black-300 mt-4 text-center">
+                    {getCurrentItem()?.name}
+                  </Text>
+                  
+                  <Text className="text-base font-rubik text-black-200 mt-2 text-center">
+                    ${getCurrentItem()?.price.toFixed(2)}
+                  </Text>
+                  
+                  <View className="flex-row items-center mt-2">
+                    <View className="flex-row items-center">
+                      <Image 
+                        source={icons.star} 
+                        className="w-4 h-4 mr-1"
+                        style={{ tintColor: '#FFD700' }}
+                      />
+                      <Text className="text-sm font-rubik">{getCurrentItem()?.rating}</Text>
+                    </View>
+                  </View>
+                </View>
+                
+                {/* Location details */}
+                <View className="w-full bg-gray-50 p-4 rounded-lg mt-4">
+                  <Text className="font-rubik-medium text-black-300">Location</Text>
+                  <Text className="font-rubik text-black-200 mt-1">
+                    {getCurrentItem()?.category.replace(/([A-Z])/g, ' $1').trim()}
+                  </Text>
+                  {/* We could add more specific location details here */}
+                </View>
+                
+                {/* Action Buttons */}
+                <View className="w-full flex-row justify-between mt-6">
+                  <TouchableOpacity 
+                    onPress={handleItemSkipped}
+                    className="flex-1 py-3 border border-gray-300 rounded-lg mr-2"
+                  >
+                    <Text className="font-rubik-medium text-black-300 text-center">Skip</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    onPress={handleItemRetrieved}
+                    className="flex-1 py-3 bg-primary-300 rounded-lg ml-2"
+                  >
+                    <Text className="font-rubik-medium text-white text-center">Got It!</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           </View>
         </Modal>
